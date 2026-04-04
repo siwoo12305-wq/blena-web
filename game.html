@@ -44,7 +44,7 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
 #mon-sprite {
     width:240px; height:240px;
     top:100px; right:80px;
-    transform:scaleX(-1); /* 왼쪽 바라봄 */
+    /* 몬스터는 원본 방향 그대로 (이미 왼쪽 바라봄) */
 }
 #mon-sprite.hit {
     filter:brightness(2) saturate(0) sepia(1) hue-rotate(300deg);
@@ -54,17 +54,17 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
     animation:pet-attack 0.4s ease-out;
 }
 @keyframes hit-shake {
-    0%{transform:scaleX(-1) translateX(0)} 25%{transform:scaleX(-1) translateX(-15px)}
-    50%{transform:scaleX(-1) translateX(10px)} 75%{transform:scaleX(-1) translateX(-8px)}
-    100%{transform:scaleX(-1) translateX(0)}
+    0%{transform:translateX(0)} 25%{transform:translateX(15px)}
+    50%{transform:translateX(-10px)} 75%{transform:translateX(8px)}
+    100%{transform:translateX(0)}
 }
 @keyframes pet-attack {
     0%{transform:translateX(0)} 30%{transform:translateX(60px)}
     60%{transform:translateX(40px)} 100%{transform:translateX(0)}
 }
 @keyframes mon-attack {
-    0%{transform:scaleX(-1) translateX(0)} 30%{transform:scaleX(-1) translateX(-60px)}
-    60%{transform:scaleX(-1) translateX(-40px)} 100%{transform:scaleX(-1) translateX(0)}
+    0%{transform:translateX(0)} 30%{transform:translateX(-60px)}
+    60%{transform:translateX(-40px)} 100%{transform:translateX(0)}
 }
 #mon-sprite.mon-attack { animation:mon-attack 0.4s ease-out; }
 
@@ -355,8 +355,8 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
     <h2 id="result-title">결과</h2>
     <p id="result-desc"></p>
     <div style="display:flex;gap:12px">
-        <button class="result-btn btn-continue" id="btn-continue" onclick="doAction('continue')" style="display:none">▶️ 계속하기</button>
-        <button class="result-btn btn-end"      id="btn-end-game" onclick="doAction('end')">🏆 종료</button>
+        <button class="result-btn btn-continue" id="btn-continue" onclick="continueGame()" style="display:none">▶️ 계속하기</button>
+        <button class="result-btn btn-end"      id="btn-end-game" onclick="endGame()">🏆 종료</button>
     </div>
 </div>
 
@@ -469,8 +469,10 @@ function renderAll() {
     // 버튼
     renderButtons();
 
-    // 결과 화면
-    if (g.phase === 'result') showResult();
+    // 결과/패배 화면
+    if (g.phase === 'result' || g.phase === 'defeat') {
+        setTimeout(showResult, 300);
+    }
 }
 
 function updateBar(id, cur, max, label, isDef=false) {
@@ -566,6 +568,61 @@ async function doAction(action) {
 async function playActionAnim(action) {
     const pet = gameState.party[gameState.active];
     const elem = pet.element;
+
+    // 결과 화면 행동
+    if (action === 'continue') {
+        document.getElementById('result-screen').classList.remove('show');
+        gameState.phase = 'battle';
+        gameState.monster = makeTestMon(gameState.floor);
+        // 파티 HP 20% 회복
+        gameState.party.forEach(p => {
+            if (p.alive) {
+                p.hp = Math.min(p.max_hp, p.hp + Math.floor(p.max_hp * 0.20));
+                p.cur_mana = Math.min(p.max_mana, p.cur_mana + Math.floor(p.max_mana * 0.25));
+            }
+        });
+        renderAll();
+        // API에도 전달
+        try {
+            const r = await fetch(`${API}/api/game/action`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({token, action:'continue'})
+            });
+            if (r.ok) { const data = await r.json(); if(data.game_state) gameState = data.game_state; renderAll(); }
+        } catch(e) { console.log('continue api failed, using local'); }
+        actionLocked = false; renderButtons(); return;
+    }
+    if (action === 'end') {
+        // 종료 결과 전송
+        try {
+            await fetch(`${API}/api/game/result`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({token, result:'end'})
+            });
+        } catch(e) {}
+        document.getElementById('result-screen').innerHTML = `
+            <h2 style="color:#FFD700">🏆 게임 종료!</h2>
+            <p>${Math.max(0,gameState.floor-1)}층 클리어 | 🍃${gameState.silver} 🌟${gameState.gold}</p>
+            <p style="color:#aaa;margin-top:8px">Discord에서 보상을 확인하세요!</p>
+        `;
+        actionLocked = false; return;
+    }
+    if (action === 'give_up') {
+        if (!confirm('정말 포기하시겠습니까? 배팅금이 몰수됩니다.')) { actionLocked=false; renderButtons(); return; }
+        try {
+            await fetch(`${API}/api/game/result`, {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({token, result:'give_up'})
+            });
+        } catch(e) {}
+        document.getElementById('result-screen').classList.add('show');
+        document.getElementById('result-title').textContent = '🏳️ 포기';
+        document.getElementById('result-title').style.color = '#888';
+        document.getElementById('result-desc').textContent = `${Math.max(0,gameState.floor-1)}층에서 포기 | 배팅금 몰수`;
+        document.getElementById('btn-continue').style.display = 'none';
+        document.getElementById('btn-end-game').textContent = '🔙 닫기';
+        actionLocked = false; return;
+    }
 
     if (['skill1','skill2','ult','secret'].includes(action)) {
         // 1. 펫 공격 모션
@@ -724,7 +781,7 @@ function simulateAction(action) {
         if (g.wins >= 3) g.phase = 'result';
         else { g.floor += 1; g.monster = makeTestMon(g.floor); }
         g.parry_available = false;
-        return {game_state:g, logs};
+        return {game_state:game, logs};
     }
 
     // 몬스터 공격
@@ -746,7 +803,7 @@ function simulateAction(action) {
     pet.buffs = (pet.buffs||[]).map(b=>({...b,duration:b.duration-1})).filter(b=>b.duration>0);
     pet.cur_mana = Math.min(pet.max_mana, pet.cur_mana + Math.floor(pet.max_mana*0.15));
 
-    return {game_state:g, logs};
+    return {game_state:game, logs};
 }
 
 function makeTestMon(floor) {
@@ -826,9 +883,17 @@ function closeModal() {
 function showResult() {
     const g = gameState;
     const screen = document.getElementById('result-screen');
-    document.getElementById('result-title').textContent = g.phase==='defeat' ? '💀 패배' : '✅ 승리!';
-    document.getElementById('result-desc').textContent = `${g.floor-1}층 클리어 | 승리 ${g.wins}판 | 🍃${g.silver} 🌟${g.gold}`;
-    document.getElementById('btn-continue').style.display = g.wins>=3 ? 'block' : 'none';
+    if (g.phase === 'defeat') {
+        document.getElementById('result-title').textContent = '💀 패배';
+        document.getElementById('result-title').style.color = '#ff4444';
+        document.getElementById('btn-continue').style.display = 'none';
+    } else {
+        document.getElementById('result-title').textContent = '✅ 승리!';
+        document.getElementById('result-title').style.color = '#4ade80';
+        document.getElementById('btn-continue').style.display = 'block';
+    }
+    const floor = g.floor > 1 ? g.floor - 1 : g.floor;
+    document.getElementById('result-desc').textContent = `${floor}층 클리어 | 승리 ${g.wins}판 | 🍃${g.silver} 🌟${g.gold}`;
     screen.classList.add('show');
 }
 
@@ -838,17 +903,9 @@ function showError(msg) {
 
 // ── 유틸 ─────────────────────────────────────────────────────────
 function getPetUrl(name, state='idle') {
-    const CDN = 'https://cdn.discordapp.com/attachments/1478283579485061129';
-    const map = {
-        '토끼':{'idle':'1486930610541826139/1.png','attack':'1486930610848006174/2.png'},
-        '강아지':{'idle':'1486930651881144452/3.png','attack':'1486930652304773150/4.png'},
-        '고양이':{'idle':'1486930695871004742/5.png','attack':'1486930696223068251/6.png'},
-        '드래곤':{'idle':'1486931725874499776/41.png','attack':'1486931726268895384/42.png'},
-        '호랑이':{'idle':'1486931424979321005/31.png','attack':'1486931425382109184/32.png'},
-        '피닉스':{'idle':'1486931627434053782/37.png','attack':'1486931627803283536/38.png'},
-    };
-    if (map[name]) return `${CDN}/${map[name][state]||map[name].idle}`;
-    return `${BASE}/${encodeURIComponent(name)}_${state}.png`;
+    // GitHub raw URL — 파일명: 토끼_idle.png 형식
+    const encoded = encodeURIComponent(name);
+    return `${BASE}/${encoded}_${state}.png`;
 }
 
 function getMonUrl(mon, state='idle') {
@@ -894,6 +951,56 @@ function setAllDisabled(v) {
 }
 
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+function continueGame() {
+    // 결과 화면 닫고 다음 층 진행
+    document.getElementById('result-screen').classList.remove('show');
+    gameState.phase = 'battle';
+    // 다음 층 몬스터 생성
+    gameState.monster = makeTestMon(gameState.floor);
+    // 파티 소량 회복
+    gameState.party.forEach(p => {
+        if (p.alive) {
+            p.hp = Math.min(p.max_hp, p.hp + Math.floor(p.max_hp * 0.20));
+            p.cur_mana = Math.min(p.max_mana, p.cur_mana + Math.floor(p.max_mana * 0.25));
+        }
+    });
+    gameState.parry_available = false;
+    renderAll();
+    showLog(`⚔️ ${gameState.floor}층 도전!`);
+}
+
+function endGame() {
+    // 종료 처리 — 결과 화면에 보상 표시
+    const g = gameState;
+    const floor = g.floor > 1 ? g.floor - 1 : g.floor;
+    const bet = g.bet || 0;
+    const mult = 0.5 + (floor / 30) * 3.0;
+    const reward = g.wins >= 3 ? Math.max(Math.floor(bet*0.5), Math.floor(bet*mult)) : 0;
+
+    document.getElementById('result-screen').classList.remove('show');
+
+    // 결과 embed 표시
+    const endEmbed = document.createElement('div');
+    endEmbed.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    endEmbed.innerHTML = `
+        <div style="font-size:48px">🏆</div>
+        <h2 style="font-size:32px;color:#FFD700">게임 종료!</h2>
+        <p style="font-size:20px;color:#ccc">${floor}층 클리어</p>
+        <p style="font-size:18px;color:#4ade80">💰 ${fmtCoin(reward)} 획득!</p>
+        <p style="font-size:16px;color:#aaa">🍃${g.silver} &nbsp; 🌟${g.gold} &nbsp; 승리 ${g.wins}판</p>
+        <p style="font-size:14px;color:#888;margin-top:8px">Discord 채널에서 보상이 지급됩니다.</p>
+        <button onclick="location.reload()" style="margin-top:16px;padding:12px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer">🔄 처음으로</button>
+    `;
+    document.body.appendChild(endEmbed);
+
+    // Render API에 결과 전송
+    fetch('/api/game/result', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({token, result:'end'})
+    }).catch(e=>console.log(e));
+}
 
 // ── 시작 ─────────────────────────────────────────────────────────
 initGame();
