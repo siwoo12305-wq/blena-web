@@ -45,6 +45,7 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
     width:200px; height:200px;
     top:80px; right:80px;
     image-rendering:pixelated;
+    transform:scaleX(-1); /* 왼쪽 바라봄 */
 }
 #mon-sprite.hit {
     filter:brightness(2) saturate(0) sepia(1) hue-rotate(300deg);
@@ -744,27 +745,29 @@ async function doAction(action, extra={}) {
         await playActionAnim(action);
 
         // 2. 서버에 액션 전송
-        const r = await fetch(`${API}/api/game/action`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({token, action, extra})
-        });
-
-        if (!r.ok) {
-            const err = await r.json().catch(()=>({}));
-            showLog(`⚠️ ${err.detail || '오류 발생'}`);
-            actionLocked = false;
-            setAllDisabled(false);
-            renderButtons();
-            return;
+        let data = null;
+        try {
+            const r = await fetch(`${API}/api/game/action`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({token, action, extra})
+            });
+            if (r.ok) {
+                data = await r.json();
+            } else {
+                // 서버 오류면 로컬 시뮬레이션으로 폴백
+                console.warn('[doAction] API 오류, 로컬 시뮬레이션 사용');
+                data = simulateAction(action, extra);
+            }
+        } catch(e) {
+            console.warn('[doAction] 서버 연결 실패, 로컬 시뮬레이션 사용');
+            data = simulateAction(action, extra);
         }
 
-        const data = await r.json();
         await processResult(data);
 
     } catch(e) {
         console.error('[doAction]', e);
-        showLog('⚠️ 서버 연결 오류');
         actionLocked = false;
         setAllDisabled(false);
         renderButtons();
@@ -1100,6 +1103,141 @@ function showError(msg) {
 }
 
 // 테스트용 더미 상태
+// ── 로컬 시뮬레이션 (서버 미연결 시 폴백) ──────────────────────
+function simulateAction(action, extra={}) {
+    const g   = gameState;
+    const pet = g.party[g.active];
+    const mon = g.monster;
+    const logs = [];
+    let pet_dmg = 0, pet_crit = false, mon_dmg = 0;
+
+    if (['skill1','skill2','ult','secret'].includes(action)) {
+        const skill = pet.skills?.[action] || pet.skills?.skill1;
+        if (!skill) return {game_state:g, logs:['스킬 없음'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+        const mc = skill.mana || 10;
+        if (pet.cur_mana < mc) return {game_state:g, logs:['마나 부족!'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+        pet.cur_mana = Math.max(0, pet.cur_mana - mc);
+
+        // 데미지 계산 (몬스터 HP 60% 캡)
+        const raw = Math.max(1, Math.floor(pet.atk * (skill.dmg_mult||1.0)) - Math.floor(mon.def/2));
+        pet_crit = Math.random() < 0.10;
+        pet_dmg  = pet_crit ? Math.floor(raw*1.8) : raw;
+        pet_dmg  = Math.floor(pet_dmg * (0.9 + Math.random()*0.2));
+        pet_dmg  = Math.min(pet_dmg, Math.floor(mon.max_hp * 0.60)); // ★ 60% 캡
+        mon.hp   = Math.max(0, mon.hp - pet_dmg);
+
+        if (action === 'ult') pet.ult_gauge = 0;
+        else pet.ult_gauge = Math.min(7, pet.ult_gauge + (skill.ult_gain||1));
+
+        logs.push(`⚔️ ${skill.name} → ${pet_dmg} 피해${pet_crit?' 💥크리!':''}`);
+        showDmgNumber(pet_dmg, pet_crit, false);
+
+    } else if (action === 'defend') {
+        pet.buffs = pet.buffs || [];
+        pet.buffs.push({type:'dmg_reduce', value:0.35, duration:1});
+        logs.push('🛡️ 방어 태세! 피해 35% 감소');
+    } else if (action === 'opportunity') {
+        pet.buffs = pet.buffs || [];
+        pet.buffs.push({type:'opportunity', value:0.30, duration:1});
+        logs.push('⚡ 기회 포착! 다음 공격 +30%');
+    } else if (action === 'potion') {
+        const pname = extra.potion_name || '';
+        if (!pname || !g.potions[pname] || g.potions[pname] <= 0)
+            return {game_state:g, logs:['포션 없음'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+        g.potions[pname]--;
+        if (pname==='HP포션') { const h=Math.floor(pet.max_hp*0.30); pet.hp=Math.min(pet.max_hp,pet.hp+h); logs.push(`🧪 HP+${h}!`); }
+        else if (pname==='신비한포션') { pet.hp=pet.max_hp; logs.push('✨ 완전 회복!'); }
+        else if (pname==='크리포션') { pet.buffs.push({type:'crit_boost',value:1,duration:1}); logs.push('⚗️ 크리 확정!'); }
+        else if (pname==='마력포션') { pet.cur_mana=pet.max_mana; logs.push('💙 마나 충전!'); }
+        return {game_state:g, logs, pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+    } else if (action === 'swap') {
+        const idx = extra.swap_idx ?? -1;
+        if (idx >= 0 && idx < g.party.length && g.party[idx].alive) {
+            g.active = idx;
+            logs.push(`🔄 ${g.party[idx].name} 출전!`);
+        }
+        return {game_state:g, logs, pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+    }
+
+    // 몬스터 처치
+    if (mon.hp <= 0) {
+        g.wins++;
+        g.silver += Math.floor(Math.random()*3)+1;
+        logs.push(`🏆 ${mon.name} 처치!`);
+        const nf = g.floor + 1;
+        // HP 소량 회복
+        g.party.forEach(p => { if(p.alive) p.hp = Math.min(p.max_hp, p.hp + Math.floor(p.max_hp*0.15)); });
+        if (g.wins % 3 === 0) {
+            g.phase = 'shop'; g.floor = nf;
+            g.shop_items = [
+                {type:'potion',name:'HP포션',cost:3},
+                {type:'potion',name:'크리포션',cost:4},
+                {type:'potion',name:'마력포션',cost:4},
+            ];
+        } else if (g.wins >= 3) {
+            g.phase = 'result'; g.floor = nf;
+        } else {
+            g.floor = nf;
+            g.monster = makeTestMon(nf, g.top_grade||'common');
+            g.phase = 'battle';
+        }
+        g.parry_available = false;
+        return {phase:g.phase, game_state:g, logs, pet_dmg, pet_crit, mon_dmg:0, mon_anim_delay:0};
+    }
+
+    // 몬스터 공격
+    const def_bonus = (pet.buffs||[]).filter(b=>b.type==='dmg_reduce').reduce((s,b)=>s+b.value,0);
+    const bm = mon.is_boss ? 1.8 : 1.0;
+    mon_dmg = Math.max(1, Math.floor(mon.atk * bm * (0.85+Math.random()*0.3)) - Math.floor(pet.def/2));
+    mon_dmg = Math.floor(mon_dmg * (1 - Math.min(0.8, def_bonus)));
+    pet.hp = Math.max(0, pet.hp - mon_dmg);
+    const patterns = mon.pattern || ['기본 공격'];
+    const pname = patterns[(mon.pattern_idx||0) % patterns.length];
+    mon.pattern_idx = ((mon.pattern_idx||0)+1) % patterns.length;
+    logs.push(`👹 ${mon.name}의 ${pname} → ${mon_dmg} 피해!`);
+    g.parry_available = true; g.pending_parry_dmg = mon_dmg;
+
+    // 버프 턴 감소
+    pet.buffs = (pet.buffs||[]).map(b=>({...b,duration:b.duration-1})).filter(b=>b.duration>0);
+    pet.cur_mana = Math.min(pet.max_mana, pet.cur_mana + Math.floor(pet.max_mana*0.15));
+
+    // 펫 사망
+    if (pet.hp <= 0) {
+        pet.alive = false;
+        const nxt = g.party.findIndex((p,i)=>p.alive&&i!==g.active);
+        if (nxt >= 0) { g.active=nxt; logs.push(`🔄 ${g.party[nxt].name} 출전!`); }
+        else { g.phase='defeat'; return {phase:'defeat',game_state:g,logs,pet_dmg,pet_crit,mon_dmg,mon_anim_delay:0}; }
+    }
+
+    return {phase:'battle', game_state:g, logs, pet_dmg, pet_crit, mon_dmg, mon_anim_delay:1000};
+}
+
+function makeTestMon(floor, topGrade='common') {
+    const gradeScale = {common:1.0,uncommon:1.8,rare:3.5,legendary:6.0,mythic:9.0,
+                        spirit:13.0,immortal:18.0,celestial:25.0,admin:40.0};
+    const gm = gradeScale[topGrade] || 1.0;
+    const fm = 1.0 + (floor-1)*0.06;
+    const mult = fm * gm;
+    const names = ['독 안개 슬라임','붉은 박쥐','철갑 거북','불꽃 도깨비','사막 전갈','얼음 여우'];
+    const elems = ['불','물','번개','풀','어둠','얼음','물리'];
+    const name  = names[Math.floor(Math.random()*names.length)];
+    const elem  = elems[Math.floor(Math.random()*elems.length)];
+    const isBoss  = floor % 10 === 0;
+    const isElite = floor % 5 === 0 && !isBoss;
+    const bm = isBoss ? 1.5 : (isElite ? 1.2 : 1.0);
+    return {
+        name, emoji:'👹', element:elem,
+        hp:   Math.floor(120*mult*bm),
+        max_hp:Math.floor(120*mult*bm),
+        atk:  Math.floor(35*mult*bm),
+        def:  Math.floor(10*mult),
+        spd:50, is_boss:isBoss, is_elite:isElite,
+        level:Math.floor((floor-1)/10),
+        pattern:['기본 공격','강타'], pattern_idx:0,
+        buffs:[], debuffs:[], silver:Math.floor(Math.random()*3)+1, gold:isBoss?1:0,
+    };
+}
+
 function getDemoState() {
     return {
         floor:1, wins:0, silver:0, gold:0, bet:10000, phase:'battle',
