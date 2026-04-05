@@ -34,37 +34,48 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
 /* 스프라이트 */
 .sprite {
     position:absolute;
-    image-rendering:pixelated;
     transition:transform 0.15s ease-out, filter 0.1s;
 }
 #pet-sprite {
-    width:280px; height:280px;
+    width:200px; height:200px;
     bottom:160px; left:80px;
+    image-rendering:pixelated;
 }
 #mon-sprite {
-    width:240px; height:240px;
-    top:100px; right:80px;
-    /* 몬스터는 원본 방향 그대로 (이미 왼쪽 바라봄) */
+    width:200px; height:200px;
+    top:80px; right:80px;
+    image-rendering:pixelated;
 }
 #mon-sprite.hit {
     filter:brightness(2) saturate(0) sepia(1) hue-rotate(300deg);
     animation:hit-shake 0.3s ease-out;
 }
-#pet-sprite.attack {
-    animation:pet-attack 0.4s ease-out;
+#pet-sprite.attack { animation:pet-attack 0.4s ease-out; }
+/* 모바일 */
+@media (max-width:600px) {
+    #pet-sprite { width:120px; height:120px; bottom:130px; left:8px; }
+    #mon-sprite { width:120px; height:120px; top:55px; right:8px; }
+    #pet-ui { width:calc(100vw - 20px); left:10px; bottom:6px; }
+    #mon-ui { width:calc(100vw - 20px); right:10px; top:6px; font-size:11px; }
+    #skill-row1, #skill-row2 { gap:3px; padding:4px 6px 2px; }
+    .skill-btn { font-size:11px; padding:0 4px; }
+    .skill-btn .btn-name { font-size:11px; }
+    #hud { padding:4px 8px; height:38px; }
+    #hud .floor { font-size:14px; }
+    #hud .resources { font-size:10px; gap:6px; }
 }
 @keyframes hit-shake {
-    0%{transform:translateX(0)} 25%{transform:translateX(15px)}
-    50%{transform:translateX(-10px)} 75%{transform:translateX(8px)}
-    100%{transform:translateX(0)}
+    0%{transform:scaleX(-1) translateX(0)} 25%{transform:scaleX(-1) translateX(-15px)}
+    50%{transform:scaleX(-1) translateX(10px)} 75%{transform:scaleX(-1) translateX(-8px)}
+    100%{transform:scaleX(-1) translateX(0)}
 }
 @keyframes pet-attack {
     0%{transform:translateX(0)} 30%{transform:translateX(60px)}
     60%{transform:translateX(40px)} 100%{transform:translateX(0)}
 }
 @keyframes mon-attack {
-    0%{transform:translateX(0)} 30%{transform:translateX(-60px)}
-    60%{transform:translateX(-40px)} 100%{transform:translateX(0)}
+    0%{transform:scaleX(-1) translateX(0)} 30%{transform:scaleX(-1) translateX(-60px)}
+    60%{transform:scaleX(-1) translateX(-40px)} 100%{transform:scaleX(-1) translateX(0)}
 }
 #mon-sprite.mon-attack { animation:mon-attack 0.4s ease-out; }
 
@@ -237,8 +248,8 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
         <div id="battle-bg"></div>
 
         <!-- 스프라이트 -->
-        <img id="pet-sprite"  class="sprite" src="" alt="펫" onerror="this.style.display='none'">
-        <img id="mon-sprite"  class="sprite" src="" alt="몬스터" onerror="this.style.display='none'">
+        <canvas id="pet-sprite" class="sprite" width="200" height="200"></canvas>
+        <canvas id="mon-sprite" class="sprite" width="200" height="200"></canvas>
 
         <!-- 이펙트 -->
         <div id="effect-layer"></div>
@@ -355,336 +366,629 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
     <h2 id="result-title">결과</h2>
     <p id="result-desc"></p>
     <div style="display:flex;gap:12px">
-        <button class="result-btn btn-continue" id="btn-continue" onclick="continueGame()" style="display:none">▶️ 계속하기</button>
-        <button class="result-btn btn-end"      id="btn-end-game" onclick="endGame()">🏆 종료</button>
+        <button class="result-btn btn-continue" id="btn-continue" onclick="doAction('continue')" style="display:none">▶️ 계속하기</button>
+        <button class="result-btn btn-end"      id="btn-end-game" onclick="doAction('end')">🏆 종료</button>
     </div>
 </div>
 
 <script>
-// ── 설정 ─────────────────────────────────────────────────────────
-const API = window.location.origin;
+// ════════════════════════════════════════════════════════
+// 설정
+// ════════════════════════════════════════════════════════
+const API   = window.location.origin;
 const token = new URLSearchParams(window.location.search).get('token') || 'test';
-let gameState = null;
+const BASE  = 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main';
+const ELEM_EFFECT = {불:'fire',물:'ice',번개:'lightning',어둠:'dark',얼음:'ice',풀:'heal',물리:'slash'};
+
+let gameState   = null;
 let actionLocked = false;
 
-// ── 이미지 베이스 URL ─────────────────────────────────────────────
-const BASE = 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main';
-const ELEM_EFFECT = {
-    '불':'fire','물':'ice','번개':'lightning','어둠':'dark','얼음':'ice','풀':'heal','물리':'slash'
-};
-
-// ── 게임 초기화 ───────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// 초기화
+// ════════════════════════════════════════════════════════
 async function initGame() {
     try {
         const r = await fetch(`${API}/api/game/state?token=${token}`);
-        if (!r.ok) { showError('게임 세션 없음. 디스코드에서 /블레나 시작 하세요.'); return; }
+        if (!r.ok) { showError('게임 세션이 없습니다.<br>Discord에서 <b>/블레나 시작</b> 을 먼저 하세요.'); return; }
         gameState = await r.json();
-        renderAll();
     } catch(e) {
-        // 테스트 모드
-        console.log('API 없음, 테스트 모드');
+        console.warn('API 없음, 테스트 모드');
         gameState = getDemoState();
-        renderAll();
+    }
+    renderAll();
+}
+
+// ════════════════════════════════════════════════════════
+// canvas 스프라이트 드로잉 (검은 배경 없음)
+// ════════════════════════════════════════════════════════
+const PET_COLORS = {
+    토끼:{body:'#e0b8d0',acc:'#ffb0c0',eye:'#ff3060'},강아지:{body:'#d4aa78',acc:'#b48250',eye:'#3a1a00'},
+    고양이:{body:'#969696',acc:'#c89696',eye:'#22cc44'},다람쥐:{body:'#b48230',acc:'#d4a240',eye:'#220000'},
+    돼지:{body:'#ffb4b4',acc:'#ff8890',eye:'#cc2244'},양:{body:'#f0f0f0',acc:'#c8b8b0',eye:'#334433'},
+    말:{body:'#a07846',acc:'#785028',eye:'#221100'},늑대:{body:'#646478',acc:'#4a4a60',eye:'#ff4400'},
+    고릴라:{body:'#3c2d23',acc:'#503828',eye:'#ff6600'},코끼리:{body:'#8c8c96',acc:'#787882',eye:'#334466'},
+    판다:{body:'#f0f0f0',acc:'#141414',eye:'#111111'},곰:{body:'#50371e',acc:'#644628',eye:'#220000'},
+    독수리:{body:'#504632',acc:'#ffb400',eye:'#ff6600'},샤크:{body:'#5082aa',acc:'#3c6488',eye:'#001133'},
+    악어:{body:'#32783c',acc:'#286430',eye:'#ff5500'},사자:{body:'#c89632',acc:'#ffc850',eye:'#ff8800'},
+    호랑이:{body:'#d46e1e',acc:'#000000',eye:'#ff4400'},유니콘:{body:'#f0c8ff',acc:'#ffb4dc',eye:'#aa44ff'},
+    티렉스:{body:'#3c7830',acc:'#50a040',eye:'#ff2200'},피닉스:{body:'#dc5014',acc:'#ffa000',eye:'#ffff00'},
+    오니:{body:'#b41e1e',acc:'#ff5000',eye:'#ffff00'},드래곤:{body:'#b43218',acc:'#dc5014',eye:'#ff0000'},
+    바이퍼:{body:'#14b464',acc:'#0af078',eye:'#00ff88'},제우스:{body:'#f0dc50',acc:'#ffff78',eye:'#0044ff'},
+    하데스:{body:'#281450',acc:'#643296',eye:'#aa00ff'},_def:{body:'#9664b4',acc:'#8250a0',eye:'#ff88ff'},
+};
+const MON_COLORS = {
+    슬라임:'#3cc850',고블린:'#50a03c',박쥐:'#503264',거북:'#3c8250',전갈:'#8c6420',
+    까마귀:'#32283c',사슴:'#78582e',벌레:'#b45014',여우:'#b47820',개구리:'#3ca03c',
+    벌:'#b49614',유령:'#b4a0dc',해골:'#c8bea8',멧돼지:'#785040',도적:'#5a4632',
+    기사:'#828296',물고기:'#3c78b4',드워프:'#78582e',도마뱀:'#3c9650',골렘:'#968c82',
+    버섯:'#b43c8c',늑대:'#645058',거미:'#503c50',양:'#c8beb4',도깨비:'#c8501e',
+    심연:'#281450',광폭:'#641e96',황금:'#c8aa14',독왕:'#50a028',블러드:'#b4141e',
+    아이스:'#78b4dc',쉐도우:'#321e46',파괴자:'#5064c8',검은:'#14101e',_def:'#a03232',
+};
+function _getMonColor(name) {
+    for (const [k,c] of Object.entries(MON_COLORS)) if (name.includes(k)) return c;
+    return MON_COLORS._def;
+}
+function _hexToRgb(h) {
+    const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+    return [r,g,b];
+}
+function _shade(hex, factor=0.6) {
+    const [r,g,b]=_hexToRgb(hex);
+    return `rgb(${Math.floor(r*factor)},${Math.floor(g*factor)},${Math.floor(b*factor)})`;
+}
+
+function drawPetSprite(canvasId, name, hpRatio=1.0, isAttack=false) {
+    const cv = document.getElementById(canvasId);
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+
+    const col = PET_COLORS[name] || PET_COLORS._def;
+    const body = col.body, acc = col.acc, eye = col.eye;
+    const cx = isAttack ? W*0.58 : W*0.5;
+    const cy = H*0.54;
+    const s  = Math.min(W,H)*0.34;
+
+    // HP에 따른 색상 변화
+    const bodyC = hpRatio < 0.3 ? _shade(body, 0.7) : body;
+    const accC  = hpRatio < 0.3 ? _shade(acc, 0.7)  : acc;
+
+    // 그림자
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy+s*0.55, s*0.65, s*0.15, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // 몸통
+    ctx.fillStyle = bodyC;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, s*0.7, s*0.58, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 머리
+    const hx = cx + s*0.28, hy = cy - s*0.32, hr = s*0.36;
+    ctx.fillStyle = bodyC;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, hr, hr*0.9, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 귀
+    ctx.fillStyle = accC;
+    ctx.beginPath();
+    ctx.ellipse(hx - hr*0.5, hy - hr*0.85, hr*0.22, hr*0.38, -0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(hx + hr*0.5, hy - hr*0.85, hr*0.22, hr*0.38, 0.3, 0, Math.PI*2);
+    ctx.fill();
+
+    // 눈
+    const eyeC = hpRatio <= 0 ? '#ff2222' : eye;
+    ctx.fillStyle = eyeC;
+    ctx.beginPath();
+    ctx.ellipse(hx - hr*0.3, hy - hr*0.1, hr*0.13, hr*0.16, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(hx - hr*0.27, hy - hr*0.13, hr*0.05, hr*0.06, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 공격 포즈 — 앞발 뻗음
+    if (isAttack) {
+        ctx.fillStyle = bodyC;
+        ctx.beginPath();
+        ctx.ellipse(cx + s*0.65, cy - s*0.05, s*0.22, s*0.14, 0.5, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // 등급별 반짝이 (ult 게이지 시각적)
+    if (hpRatio > 0.8) {
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = accC;
+        ctx.beginPath();
+        ctx.ellipse(hx + hr*0.4, hy - hr*0.6, hr*0.08, hr*0.18, 0.8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
     }
 }
 
-// ── 테스트용 더미 상태 ────────────────────────────────────────────
-function getDemoState() {
-    return {
-        floor:1, wins:0, silver:0, gold:0, bet:10000,
-        phase:'battle',
-        party:[{
-            name:'드래곤', emoji:'🔴', grade:'mythic', element:'불', element_raw:'불',
-            level:10, hp:700, max_hp:700, atk:230, def:140,
-            cur_mana:130, max_mana:130, ult_gauge:3, alive:true,
-            skills:{
-                skill1:{name:'드래곤 클로', mana:20, dmg_mult:1.4},
-                skill2:{name:'화염 브레스', mana:40, dmg_mult:2.0},
-                ult:{name:'용의 분노', mana:0, dmg_mult:3.0},
-            },
-            skill_cd:{}, buffs:[], debuffs:[],
-        }],
-        active:0,
-        monster:{
-            name:'독 안개 슬라임', emoji:'🟢', element:'풀',
-            hp:1080, max_hp:1080, atk:315, def:90, spd:50,
-            is_boss:false, is_elite:false, level:0,
-            pattern:['점액 투척','독 안개'],pattern_idx:0,
-            buffs:[], debuffs:[],
-        },
-        potions:{'HP포션':3},
-        parry_available:false,
-    };
+function drawMonSprite(canvasId, name, elem, hpRatio=1.0, isBoss=false, isElite=false) {
+    const cv = document.getElementById(canvasId);
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+
+    const baseColor = _getMonColor(name);
+    const bodyC = hpRatio < 0.3 ? _shade(baseColor, 0.7) : baseColor;
+    const detC  = isBoss ? '#ff4400' : (isElite ? '#aa44ff' : _shade(baseColor, 0.55));
+    const eyeC  = isBoss ? '#ff0000' : (isElite ? '#cc00ff' : '#ff3300');
+
+    const cx = W*0.5, cy = H*0.5;
+    const s  = Math.min(W,H) * (isBoss ? 0.40 : (isElite ? 0.37 : 0.33));
+
+    // 그림자
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy+s*0.62, s*0.7, s*0.16, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // 보스/엘리트 오라
+    if (isBoss || isElite) {
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        const grad = ctx.createRadialGradient(cx,cy,s*0.3, cx,cy,s*1.1);
+        grad.addColorStop(0, isBoss?'#ff4400':'#aa00ff');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, s*1.1, s*1.1, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // 몸통
+    ctx.fillStyle = bodyC;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, s*0.75, s*0.65, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 머리 (반대 방향 — 오른쪽)
+    const hx = cx - s*0.28, hy = cy - s*0.28, hr = s*0.38;
+    ctx.fillStyle = bodyC;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, hr, hr*0.88, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 뿔/장식 (보스/엘리트)
+    if (isBoss) {
+        ctx.fillStyle = '#ff8800';
+        ctx.beginPath();
+        ctx.moveTo(hx - hr*0.2, hy - hr*0.8);
+        ctx.lineTo(hx - hr*0.5, hy - hr*1.6);
+        ctx.lineTo(hx + hr*0.1, hy - hr*0.8);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(hx + hr*0.3, hy - hr*0.7);
+        ctx.lineTo(hx + hr*0.0, hy - hr*1.4);
+        ctx.lineTo(hx + hr*0.6, hy - hr*0.7);
+        ctx.fill();
+    } else if (isElite) {
+        ctx.fillStyle = '#cc44ff';
+        ctx.beginPath();
+        ctx.moveTo(hx, hy - hr*0.9);
+        ctx.lineTo(hx - hr*0.3, hy - hr*1.5);
+        ctx.lineTo(hx + hr*0.3, hy - hr*1.5);
+        ctx.fill();
+    }
+
+    // 눈
+    ctx.fillStyle = eyeC;
+    ctx.beginPath();
+    ctx.ellipse(hx + hr*0.22, hy - hr*0.08, hr*0.15, hr*0.18, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(hx + hr*0.26, hy - hr*0.12, hr*0.05, hr*0.06, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // 이빨/디테일
+    ctx.fillStyle = detC;
+    ctx.beginPath();
+    ctx.moveTo(hx + hr*0.15, hy + hr*0.3);
+    ctx.lineTo(hx + hr*0.25, hy + hr*0.55);
+    ctx.lineTo(hx + hr*0.35, hy + hr*0.3);
+    ctx.fill();
+
+    // HP 낮으면 상처 표시
+    if (hpRatio < 0.3 && hpRatio > 0) {
+        ctx.save();
+        ctx.strokeStyle = '#ff2222';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(cx - s*0.2, cy - s*0.3);
+        ctx.lineTo(cx + s*0.1, cy + s*0.1);
+        ctx.stroke();
+        ctx.restore();
+    }
 }
 
-// ── 전체 렌더 ─────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// 렌더링
+// ════════════════════════════════════════════════════════
 function renderAll() {
     if (!gameState) return;
-    const g = gameState;
+    const g   = gameState;
     const pet = g.party[g.active];
     const mon = g.monster;
 
+    // 결과/패배 화면
+    if (g.phase === 'result' || g.phase === 'defeat' || g.phase === 'ended') {
+        showResultScreen(); return;
+    }
+    if (g.phase === 'shop')  { showShopScreen();  return; }
+    if (g.phase === 'event') { showEventScreen(); return; }
+
+    document.getElementById('result-screen').classList.remove('show');
+
     // HUD
-    document.getElementById('floor-num').textContent = g.floor;
+    document.getElementById('floor-num').textContent  = g.floor;
     document.getElementById('bet-display').textContent = fmtCoin(g.bet);
     document.getElementById('silver-display').textContent = g.silver;
-    document.getElementById('gold-display').textContent = g.gold;
-    document.getElementById('wins-display').textContent = g.wins;
+    document.getElementById('gold-display').textContent   = g.gold;
+    document.getElementById('wins-display').textContent   = g.wins;
+
+    // 속성 상성 표시
+    document.getElementById('elem-info').textContent =
+        `${pet.element} vs ${mon.element} ${getElemAdv(pet.element, mon.element)}`;
 
     // 배경
-    const bgMap = {normal:'/normal_field.png', boss:'/Boss_field.png', elite:'/normal_field.png'};
     const bgKey = mon.is_boss ? 'boss' : (mon.is_elite ? 'elite' : 'normal');
+    const bgMap = {normal:'/normal_field.png', boss:'/Boss_field.png', elite:'/normal_field.png'};
     document.getElementById('battle-bg').style.backgroundImage = `url('${BASE}${bgMap[bgKey]}')`;
 
-    // 펫 스프라이트
-    const petImg = document.getElementById('pet-sprite');
-    petImg.src = getPetUrl(pet.name, 'idle');
-    petImg.style.display = 'block';
-
-    // 몬스터 스프라이트
-    const monImg = document.getElementById('mon-sprite');
-    monImg.src = getMonUrl(mon, 'idle');
-    monImg.style.display = 'block';
+    // ★ canvas 스프라이트 (검은 배경 없음)
+    drawPetSprite('pet-sprite', pet.name, pet.hp / pet.max_hp, false);
+    drawMonSprite('mon-sprite', mon.name, mon.element, mon.hp / mon.max_hp, mon.is_boss, mon.is_elite);
 
     // 펫 UI
-    document.getElementById('pet-name').textContent = `${pet.emoji} ${pet.name}  Lv.${pet.level}  ${pet.element}`;
-    updateBar('pet-hp', pet.hp, pet.max_hp, 'HP');
-    updateBar('pet-def', pet.def, 300, 'DEF ' + pet.def, true);
-    updateBar('pet-mp', pet.cur_mana, pet.max_mana, 'MP');
-    // ULT 슬롯
-    for(let i=0;i<7;i++) {
-        document.getElementById(`ult-${i}`).className = 'ult-slot' + (i < pet.ult_gauge ? ' filled' : '');
-    }
+    document.getElementById('pet-name').textContent =
+        `${pet.emoji||'🐾'} ${pet.name}  Lv.${pet.level}  ${pet.element}`;
+    updateBar('pet-hp',  pet.hp,       pet.max_hp,   `HP ${pet.hp}/${pet.max_hp}`);
+    updateBar('pet-def', pet.def,      300,          `DEF ${pet.def}`, true);
+    updateBar('pet-mp',  pet.cur_mana, pet.max_mana, `MP ${pet.cur_mana}/${pet.max_mana}`);
+    for (let i=0;i<7;i++)
+        document.getElementById(`ult-${i}`).className = 'ult-slot'+(i<pet.ult_gauge?' filled':'');
 
     // 몬스터 UI
-    const mtype = mon.is_boss ? '👑 BOSS ' : (mon.is_elite ? '⚠️ ELITE ' : '');
-    document.getElementById('mon-name').textContent = `${mon.emoji} ${mtype}${mon.name}  Lv.${mon.level}`;
-    updateBar('mon-hp', mon.hp, mon.max_hp, 'HP');
-    updateBar('mon-def', mon.def, 200, 'DEF ' + mon.def, true);
+    const mtype = mon.is_boss?'👑 BOSS ':(mon.is_elite?'⚠️ ELITE ':'');
+    document.getElementById('mon-name').textContent =
+        `${mtype}${mon.emoji||'👹'} ${mon.name}  Lv.${mon.level||0}  ${mon.element}`;
+    updateBar('mon-hp',  mon.hp,  mon.max_hp, `HP ${mon.hp}/${mon.max_hp}`);
+    updateBar('mon-def', mon.def, 300,        `DEF ${mon.def||0}`, true);
 
-    // 속성 상성
-    const adv = getElemAdv(pet.element, mon.element);
-    document.getElementById('elem-info').textContent = `${pet.element} vs ${mon.element} = ${adv}`;
-
-    // 버튼
     renderButtons();
-
-    // 결과/패배 화면
-    if (g.phase === 'result' || g.phase === 'defeat') {
-        setTimeout(showResult, 300);
-    }
 }
 
-function updateBar(id, cur, max, label, isDef=false) {
-    const bar = document.getElementById(`${id}-bar`);
-    const txt = document.getElementById(`${id}-text`);
-    const pct = max > 0 ? Math.max(0, cur/max*100) : 0;
-    bar.style.width = pct + '%';
-    if (!isDef) {
-        bar.className = 'bar-fill hp-fill' + (pct<25?' low':(pct<50?' mid':''));
+function updateBar(id, cur, max, label, isSecondary=false) {
+    const fill = document.getElementById(`${id}-bar`);
+    const text = document.getElementById(`${id}-text`);
+    if (!fill || !text) return;
+    const pct = max>0 ? Math.max(0,Math.min(100, cur/max*100)) : 0;
+    fill.style.width = pct+'%';
+    text.textContent = label;
+    if (id.includes('hp')) {
+        fill.className = 'bar-fill hp-fill' + (pct<30?' low':(pct<60?' mid':''));
     }
-    txt.textContent = isDef ? label : `${label} ${cur}/${max}`;
 }
 
 function renderButtons() {
-    const g = gameState;
-    if (g.phase !== 'battle') return;
+    if (!gameState || actionLocked) return;
+    const g   = gameState;
     const pet = g.party[g.active];
-    const s1  = pet.skills.skill1;
-    const s2  = pet.skills.skill2;
+    const s1  = pet.skills?.skill1 || {name:'스킬1',mana:10};
+    const s2  = pet.skills?.skill2 || {name:'스킬2',mana:25};
+    const ult = pet.skills?.ult;
 
     const b1 = document.getElementById('btn-skill1');
     b1.querySelector('.btn-name').textContent = `⚔️ ${s1.name}`;
     b1.querySelector('.btn-cost').textContent = `${s1.mana}MP`;
-    b1.disabled = actionLocked || (pet.skill_cd[s1.name]||0)>0 || pet.cur_mana<s1.mana;
+    b1.disabled = actionLocked || pet.cur_mana < s1.mana || (pet.skill_cd?.[s1.name]||0)>0;
 
     const b2 = document.getElementById('btn-skill2');
     b2.querySelector('.btn-name').textContent = `💥 ${s2.name}`;
     b2.querySelector('.btn-cost').textContent = `${s2.mana}MP`;
-    b2.disabled = actionLocked || (pet.skill_cd[s2.name]||0)>0 || pet.cur_mana<s2.mana;
+    b2.disabled = actionLocked || pet.cur_mana < s2.mana || (pet.skill_cd?.[s2.name]||0)>0;
 
-    document.getElementById('btn-defend').disabled  = actionLocked;
-    document.getElementById('btn-opport').disabled  = actionLocked;
+    document.getElementById('btn-defend').disabled = actionLocked;
+    document.getElementById('btn-opport').disabled = actionLocked;
 
-    // ULT
     const ultBtn = document.getElementById('btn-ult');
-    ultBtn.style.display = pet.ult_gauge >= 7 ? 'flex' : 'none';
-    if (pet.skills.ult) ultBtn.querySelector('.btn-name').textContent = `🌟 ${pet.skills.ult.name}`;
+    ultBtn.style.display = (ult && pet.ult_gauge >= 7) ? 'flex' : 'none';
+    if (ult) ultBtn.querySelector('.btn-name').textContent = `🌟 ${ult.name}`;
 
-    // 패링
     const parryBtn = document.getElementById('btn-parry');
     parryBtn.style.display = g.parry_available ? 'flex' : 'none';
     if (g.parry_available) {
         const rate = calcParryRate(pet, g.monster);
         document.getElementById('parry-rate').textContent = `${rate}% 성공`;
-        parryBtn.querySelector('.btn-name').textContent = `⚡ 패링!`;
     }
 
-    // 포션 카운트
     const potTotal = Object.values(g.potions||{}).reduce((a,b)=>a+b,0);
     document.getElementById('potion-count').textContent = `${potTotal}개`;
-    document.getElementById('btn-potion').disabled = potTotal === 0 || actionLocked;
+    document.getElementById('btn-potion').disabled = potTotal===0 || actionLocked;
 
-    // 교체
     const aliveOthers = g.party.filter((p,i)=>p.alive&&i!==g.active);
     document.getElementById('btn-swap').disabled = aliveOthers.length===0 || actionLocked;
 }
 
-// ── 행동 실행 ─────────────────────────────────────────────────────
-async function doAction(action) {
+// ════════════════════════════════════════════════════════
+// 행동 실행 — 실제 API 연결
+// ════════════════════════════════════════════════════════
+async function doAction(action, extra={}) {
     if (actionLocked) return;
     actionLocked = true;
     setAllDisabled(true);
 
     try {
-        // 로컬 애니메이션 먼저
+        // 1. 내 공격 애니메이션 먼저 재생
         await playActionAnim(action);
 
-        // API 호출
+        // 2. 서버에 액션 전송
         const r = await fetch(`${API}/api/game/action`, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({token, action})
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({token, action, extra})
         });
-        if (r.ok) {
-            const data = await r.json();
-            await processResult(data);
-        } else {
-            // 테스트 모드 — 로컬 처리
-            const result = simulateAction(action);
-            await processResult(result);
+
+        if (!r.ok) {
+            const err = await r.json().catch(()=>({}));
+            showLog(`⚠️ ${err.detail || '오류 발생'}`);
+            actionLocked = false;
+            setAllDisabled(false);
+            renderButtons();
+            return;
         }
+
+        const data = await r.json();
+        await processResult(data);
+
     } catch(e) {
-        console.error(e);
-        const result = simulateAction(action);
-        await processResult(result);
+        console.error('[doAction]', e);
+        showLog('⚠️ 서버 연결 오류');
+        actionLocked = false;
+        setAllDisabled(false);
+        renderButtons();
+    }
+}
+
+// ════════════════════════════════════════════════════════
+// 결과 처리
+// ════════════════════════════════════════════════════════
+async function processResult(data) {
+    if (!data) return;
+
+    // 게임 상태 업데이트
+    if (data.game_state) gameState = data.game_state;
+
+    // 로그 순차 표시
+    if (data.logs && data.logs.length) {
+        for (const log of data.logs) {
+            if (log.trim()) showLog(log.replace(/\*\*/g,''));
+            await sleep(350);
+        }
     }
 
+    // 내 공격 데미지 숫자
+    if (data.pet_dmg > 0) showDmgNumber(data.pet_dmg, data.pet_crit, false);
+
+    // ★ 몬스터 반격 — mon_anim_delay 만큼 기다린 후 재생
+    const delay = data.mon_anim_delay ?? 1000;
+    if (data.mon_dmg > 0) {
+        await playMonsterAnim(data.mon_dmg, false, delay);
+    } else if (delay > 0 && data.phase === 'battle') {
+        // 몬스터가 공격 안 했어도 잠깐 대기 (스턴 등)
+        await sleep(200);
+    }
+
+    // 종료
+    if (data.phase === 'ended') {
+        const reward = data.reward || 0;
+        document.getElementById('result-title').textContent = reward > 0 ? '🏆 종료!' : '🏳️ 포기';
+        document.getElementById('result-desc').textContent =
+            `${data.floor}층 | ${data.msg || ''}`;
+        document.getElementById('btn-continue').style.display = 'none';
+        document.getElementById('result-screen').classList.add('show');
+        actionLocked = false;
+        return;
+    }
+
+    // 패배
+    if (data.phase === 'defeat') {
+        document.getElementById('result-title').textContent = '💀 전멸...';
+        document.getElementById('result-desc').textContent =
+            `${gameState?.floor||'?'}층에서 쓰러졌습니다. 배팅금 몰수.`;
+        document.getElementById('btn-continue').style.display = 'none';
+        document.getElementById('btn-end-game').textContent = '✅ 확인';
+        document.getElementById('result-screen').classList.add('show');
+        actionLocked = false;
+        return;
+    }
+
+    // 결과 화면 (계속 or 종료 선택)
+    if (data.phase === 'result') {
+        const reward = data.reward || 0;
+        document.getElementById('result-title').textContent = '✅ 처치!';
+        document.getElementById('result-desc').textContent =
+            `${gameState.floor-1}층 | 승리 ${gameState.wins}판 | 예상 보상 ${fmtCoin(reward)}`;
+        document.getElementById('btn-continue').style.display = gameState.wins >= 3 ? 'flex' : 'none';
+        document.getElementById('btn-end-game').textContent = `🏆 여기서 종료 (+${fmtCoin(reward)})`;
+        document.getElementById('result-screen').classList.add('show');
+        actionLocked = false;
+        return;
+    }
+
+    // 상점/이벤트
+    if (data.phase === 'shop')  { renderAll(); actionLocked = false; return; }
+    if (data.phase === 'event') { renderAll(); actionLocked = false; return; }
+
+    // 일반 전투 계속
+    renderAll();
     actionLocked = false;
     renderButtons();
 }
 
-// ── 애니메이션 ────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// 애니메이션
+// ════════════════════════════════════════════════════════
 async function playActionAnim(action) {
-    const pet = gameState.party[gameState.active];
+    const pet = gameState?.party?.[gameState.active];
+    if (!pet) return;
     const elem = pet.element;
-
-    // 결과 화면 행동
-    if (action === 'continue') {
-        document.getElementById('result-screen').classList.remove('show');
-        gameState.phase = 'battle';
-        gameState.monster = makeTestMon(gameState.floor);
-        // 파티 HP 20% 회복
-        gameState.party.forEach(p => {
-            if (p.alive) {
-                p.hp = Math.min(p.max_hp, p.hp + Math.floor(p.max_hp * 0.20));
-                p.cur_mana = Math.min(p.max_mana, p.cur_mana + Math.floor(p.max_mana * 0.25));
-            }
-        });
-        renderAll();
-        // API에도 전달
-        try {
-            const r = await fetch(`${API}/api/game/action`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({token, action:'continue'})
-            });
-            if (r.ok) { const data = await r.json(); if(data.game_state) gameState = data.game_state; renderAll(); }
-        } catch(e) { console.log('continue api failed, using local'); }
-        actionLocked = false; renderButtons(); return;
-    }
-    if (action === 'end') {
-        // 종료 결과 전송
-        try {
-            await fetch(`${API}/api/game/result`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({token, result:'end'})
-            });
-        } catch(e) {}
-        document.getElementById('result-screen').innerHTML = `
-            <h2 style="color:#FFD700">🏆 게임 종료!</h2>
-            <p>${Math.max(0,gameState.floor-1)}층 클리어 | 🍃${gameState.silver} 🌟${gameState.gold}</p>
-            <p style="color:#aaa;margin-top:8px">Discord에서 보상을 확인하세요!</p>
-        `;
-        actionLocked = false; return;
-    }
-    if (action === 'give_up') {
-        if (!confirm('정말 포기하시겠습니까? 배팅금이 몰수됩니다.')) { actionLocked=false; renderButtons(); return; }
-        try {
-            await fetch(`${API}/api/game/result`, {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({token, result:'give_up'})
-            });
-        } catch(e) {}
-        document.getElementById('result-screen').classList.add('show');
-        document.getElementById('result-title').textContent = '🏳️ 포기';
-        document.getElementById('result-title').style.color = '#888';
-        document.getElementById('result-desc').textContent = `${Math.max(0,gameState.floor-1)}층에서 포기 | 배팅금 몰수`;
-        document.getElementById('btn-continue').style.display = 'none';
-        document.getElementById('btn-end-game').textContent = '🔙 닫기';
-        actionLocked = false; return;
-    }
 
     if (['skill1','skill2','ult','secret'].includes(action)) {
         // 1. 펫 공격 모션
-        const petImg = document.getElementById('pet-sprite');
-        petImg.src = getPetUrl(pet.name, 'attack');
-        petImg.classList.add('attack');
-
-        // 이펙트
-        showEffect(ELEM_EFFECT[elem] || 'slash', 'pet');
+        const petCv = document.getElementById('pet-sprite');
+        petCv.classList.add('attack');
+        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, true);
+        showEffect(ELEM_EFFECT[elem]||'slash');
         await sleep(350);
 
-        // 2. 몬스터 피격
-        const monImg = document.getElementById('mon-sprite');
-        monImg.classList.add('hit');
+        // 2. 몬스터 피격 플래시
+        const monCv = document.getElementById('mon-sprite');
+        monCv.classList.add('hit');
         document.getElementById('battle-bg').classList.add('hit-flash');
         await sleep(300);
-        monImg.classList.remove('hit');
+        monCv.classList.remove('hit');
         document.getElementById('battle-bg').classList.remove('hit-flash');
 
         // 3. 펫 복귀
-        petImg.src = getPetUrl(pet.name, 'idle');
-        petImg.classList.remove('attack');
+        petCv.classList.remove('attack');
+        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
+
     } else if (action === 'parry') {
-        showEffectText('⚡ 패링!', '#f97316');
-        await sleep(200);
+        showEffectText('⚡ 패링!', '#f97316'); await sleep(200);
+    } else if (action === 'defend') {
+        showEffectText('🛡️ 방어!', '#60a5fa'); await sleep(200);
+    } else if (action === 'opportunity') {
+        showEffectText('⚡ 기회!', '#a3e635'); await sleep(200);
     }
 }
 
-async function playMonsterAnim(dmg, isCrit) {
-    // 몬스터 공격 모션
-    const monImg = document.getElementById('mon-sprite');
-    monImg.classList.add('mon-attack');
+async function playMonsterAnim(dmg, isCrit, delayMs=1000) {
+    // ★ 내 공격 후 delayMs만큼 기다렸다가 몬스터 반격
+    if (delayMs > 0) await sleep(delayMs);
+
+    const monCv = document.getElementById('mon-sprite');
+    monCv.classList.add('mon-attack');
     showEffectText('👹 공격!', '#ff6060');
     await sleep(350);
-    monImg.classList.remove('mon-attack');
+    monCv.classList.remove('mon-attack');
 
     // 펫 피격
-    const petImg = document.getElementById('pet-sprite');
-    petImg.style.filter = 'brightness(2) saturate(0)';
-    showDmgNumber(dmg, false, true); // 펫 위치
+    const petCv = document.getElementById('pet-sprite');
+    const pet = gameState?.party?.[gameState?.active];
+    petCv.style.filter = 'brightness(2) saturate(0)';
+    showDmgNumber(dmg, isCrit, true);
     await sleep(300);
-    petImg.style.filter = '';
+    petCv.style.filter = '';
+    if (pet) drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
 }
 
-function showEffect(type, target) {
+// ════════════════════════════════════════════════════════
+// 결과/상점/이벤트 화면
+// ════════════════════════════════════════════════════════
+function showResultScreen() {
+    const g = gameState;
+    if (!g) return;
+    if (g.phase === 'defeat') {
+        document.getElementById('result-title').textContent = '💀 전멸...';
+        document.getElementById('result-desc').textContent = `${g.floor}층에서 쓰러졌습니다`;
+        document.getElementById('btn-continue').style.display = 'none';
+    } else {
+        document.getElementById('result-title').textContent = '✅ 처치!';
+        document.getElementById('result-desc').textContent = `${g.floor-1}층 | 승리 ${g.wins}판`;
+        document.getElementById('btn-continue').style.display = g.wins>=3 ? 'flex' : 'none';
+    }
+    document.getElementById('result-screen').classList.add('show');
+}
+
+function showShopScreen() {
+    const g = gameState;
+    const items = g.shop_items || [];
+    document.getElementById('modal-title').textContent = '🏪 바이퍼의 상점';
+    const content = document.getElementById('modal-content');
+    content.innerHTML = `<p style="color:#aaa;margin-bottom:8px">🍃 은잎: <b style="color:#6ee7b7">${g.silver}</b></p>` +
+        items.map((item,i) => {
+            const label = item.type==='potion'
+                ? `🧪 ${item.name} — ${item.cost}🍃`
+                : `🗡️ ${item.name} (${item.grade||''}) — ${item.cost||0}🍃`;
+            const disabled = (item.cost||0) > g.silver ? 'disabled style="opacity:0.4"' : '';
+            return `<button class="modal-btn" onclick="buyShopItem(${i})" ${disabled}>${label}</button>`;
+        }).join('') +
+        `<button class="modal-btn" style="margin-top:8px;border-color:#666" onclick="skipShop()">⏭️ 스킵</button>`;
+    document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function buyShopItem(idx) {
+    closeModal();
+    const r = await fetch(`${API}/api/game/action`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({token, action:'buy', extra:{idx}})
+    });
+    if (r.ok) { const data=await r.json(); await processResult(data); }
+}
+
+async function skipShop() {
+    closeModal();
+    const r = await fetch(`${API}/api/game/action`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({token, action:'skip_shop', extra:{}})
+    });
+    if (r.ok) { const data=await r.json(); await processResult(data); }
+}
+
+function showEventScreen() {
+    const evt = gameState.current_event || {};
+    document.getElementById('modal-title').textContent = `🎪 이벤트 — ${evt.name||'이벤트'}`;
+    const content = document.getElementById('modal-content');
+    content.innerHTML = `
+        <p style="color:#ccc;margin-bottom:10px">${evt.emoji||''} ${evt.desc||''}</p>
+        <button class="modal-btn" onclick="acceptEvent()">✅ 수락</button>`;
+    document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function acceptEvent() {
+    closeModal();
+    const r = await fetch(`${API}/api/game/action`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({token, action:'event_accept', extra:{}})
+    });
+    if (r.ok) { const data=await r.json(); await processResult(data); }
+}
+
+// ════════════════════════════════════════════════════════
+// 이펙트 / 로그
+// ════════════════════════════════════════════════════════
+function showEffect(type) {
     const layer = document.getElementById('effect-layer');
     const el = document.createElement('div');
     el.className = 'effect-text';
-
-    const effects = {
-        slash:'⚔️', fire:'🔥', ice:'❄️', lightning:'⚡', dark:'🌑', heal:'💚'
-    };
-    el.textContent = effects[type] || '✨';
+    const icons = {slash:'⚔️',fire:'🔥',ice:'❄️',lightning:'⚡',dark:'🌑',heal:'💚'};
+    el.textContent = icons[type]||'✨';
     el.style.color = {fire:'#ff6b00',ice:'#60c8ff',lightning:'#ffe000',dark:'#9b59ff',heal:'#00ff88',slash:'#fff'}[type]||'#fff';
-
-    if (target === 'pet') {
-        el.style.left = '200px'; el.style.top = '300px';
-    } else {
-        el.style.right = '150px'; el.style.top = '180px';
-    }
+    el.style.right='150px'; el.style.top='40%';
     layer.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    setTimeout(()=>el.remove(), 900);
 }
 
 function showEffectText(text, color) {
@@ -692,24 +996,21 @@ function showEffectText(text, color) {
     const el = document.createElement('div');
     el.className = 'effect-text';
     el.textContent = text;
-    el.style.color = color || '#fff';
-    el.style.left = '50%'; el.style.top = '40%';
-    el.style.transform = 'translateX(-50%)';
-    el.style.fontSize = '32px';
+    el.style.cssText = `color:${color||'#fff'};left:50%;top:40%;transform:translateX(-50%);font-size:28px`;
     layer.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    setTimeout(()=>el.remove(), 900);
 }
 
 function showDmgNumber(dmg, isCrit, onPet=false) {
     const layer = document.getElementById('effect-layer');
     const el = document.createElement('div');
     el.className = 'dmg-number';
-    el.textContent = (isCrit ? '💥' : '-') + dmg.toLocaleString();
-    el.style.color = isCrit ? '#FFD700' : (onPet ? '#ff4444' : '#ff6060');
-    if (onPet) { el.style.left='180px'; el.style.top='280px'; }
-    else       { el.style.right='100px'; el.style.top='80px'; }
+    el.textContent = (isCrit?'💥':'-') + dmg.toLocaleString();
+    el.style.color = isCrit?'#FFD700':(onPet?'#ff4444':'#ff8888');
+    if (onPet) { el.style.left='15%'; el.style.top='55%'; }
+    else       { el.style.right='15%'; el.style.top='20%'; }
     layer.appendChild(el);
-    setTimeout(() => el.remove(), 1000);
+    setTimeout(()=>el.remove(), 1000);
 }
 
 function showLog(text) {
@@ -721,137 +1022,24 @@ function showLog(text) {
     log.appendChild(el);
 }
 
-// ── 결과 처리 ─────────────────────────────────────────────────────
-async function processResult(data) {
-    if (!data) return;
-    gameState = data.game_state || gameState;
-
-    // 로그 표시
-    if (data.logs) {
-        for (const log of data.logs) {
-            showLog(log);
-            await sleep(400);
-        }
-    }
-
-    // 데미지 숫자
-    if (data.pet_dmg)  showDmgNumber(data.pet_dmg,  data.pet_crit,  false);
-    if (data.mon_dmg)  showDmgNumber(data.mon_dmg,  false,          true);
-
-    // 몬스터 공격 애니메이션
-    if (data.mon_dmg) await playMonsterAnim(data.mon_dmg, false);
-
-    renderAll();
-}
-
-// ── 로컬 시뮬레이션 (테스트용) ───────────────────────────────────
-function simulateAction(action) {
-    const g = gameState;
-    const pet = g.party[g.active];
-    const mon = g.monster;
-    const logs = [];
-    let pet_dmg = 0, pet_crit = false;
-
-    if (['skill1','skill2','ult'].includes(action)) {
-        const skill = pet.skills[action] || pet.skills.skill1;
-        const mc = skill.mana || 10;
-        pet.cur_mana = Math.max(0, pet.cur_mana - mc);
-        const raw_dmg = Math.max(1, Math.floor(pet.atk * skill.dmg_mult) - Math.floor(mon.def/2));
-        pet_crit = Math.random() < 0.10;
-        pet_dmg = pet_crit ? Math.floor(raw_dmg*1.8) : raw_dmg;
-        pet_dmg = Math.floor(pet_dmg * (0.9 + Math.random()*0.2));
-        mon.hp = Math.max(0, mon.hp - pet_dmg);
-        pet.ult_gauge = Math.min(7, pet.ult_gauge + (skill.ult_gain||1));
-        logs.push(`⚔️ ${skill.name} → ${pet_dmg} 피해${pet_crit?' 💥크리!':''}`);
-        showDmgNumber(pet_dmg, pet_crit, false);
-    } else if (action === 'defend') {
-        pet.buffs = pet.buffs || [];
-        pet.buffs.push({type:'dmg_reduce',value:0.35,duration:1});
-        logs.push('🛡️ 방어 태세! 피해 35% 감소');
-    } else if (action === 'opportunity') {
-        pet.buffs = pet.buffs || [];
-        pet.buffs.push({type:'opportunity',value:0.30,duration:1});
-        logs.push('⚡ 기회 포착! 다음 공격 +30%');
-    }
-
-    // 몬스터 처치 확인
-    if (mon.hp <= 0) {
-        g.wins += 1; g.silver += Math.floor(Math.random()*3)+1;
-        logs.push(`🏆 ${mon.name} 처치!`);
-        if (g.wins >= 3) g.phase = 'result';
-        else { g.floor += 1; g.monster = makeTestMon(g.floor); }
-        g.parry_available = false;
-        return {game_state:game, logs};
-    }
-
-    // 몬스터 공격
-    if (action !== 'defend' || Math.random() > 0.5) {
-        const patterns = mon.pattern || ['기본 공격'];
-        const pname = patterns[mon.pattern_idx % patterns.length];
-        mon.pattern_idx = (mon.pattern_idx+1) % patterns.length;
-        const def_bonus = (pet.buffs||[]).filter(b=>b.type==='dmg_reduce').reduce((s,b)=>s+b.value,0);
-        let m_dmg = Math.max(1, Math.floor(mon.atk*(0.85+Math.random()*0.3)) - Math.floor(pet.def/2));
-        m_dmg = Math.floor(m_dmg * (1 - Math.min(0.8, def_bonus)));
-        pet.hp = Math.max(0, pet.hp - m_dmg);
-        logs.push(`👹 ${mon.name}의 ${pname} → ${m_dmg} 피해!`);
-        g.parry_available = true;
-        g.pending_parry_dmg = m_dmg;
-        setTimeout(()=>showDmgNumber(m_dmg, false, true), 500);
-    }
-
-    // 버프 턴 감소
-    pet.buffs = (pet.buffs||[]).map(b=>({...b,duration:b.duration-1})).filter(b=>b.duration>0);
-    pet.cur_mana = Math.min(pet.max_mana, pet.cur_mana + Math.floor(pet.max_mana*0.15));
-
-    return {game_state:game, logs};
-}
-
-function makeTestMon(floor) {
-    const mult = 1 + (floor-1)*0.06;
-    return {
-        name:['독 안개 슬라임','붉은 박쥐','철갑 거북','불꽃 도깨비'][Math.floor(Math.random()*4)],
-        emoji:'👹', element:['불','물','번개','풀','어둠'][Math.floor(Math.random()*5)],
-        hp:Math.floor(120*mult*9), max_hp:Math.floor(120*mult*9),
-        atk:Math.floor(35*mult*9), def:Math.floor(10*mult*9),
-        spd:50, is_boss:false, is_elite:false, level:Math.floor((floor-1)/10),
-        pattern:['기본 공격','강타'], pattern_idx:0, buffs:[], debuffs:[],
-    };
-}
-
-// ── 모달 (포션/교체) ─────────────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// 모달 (포션 / 교체)
+// ════════════════════════════════════════════════════════
 function openPotion() {
-    const g = gameState;
-    const pots = Object.entries(g.potions||{}).filter(([k,v])=>v>0);
+    const g   = gameState;
+    const pots = Object.entries(g.potions||{}).filter(([,v])=>v>0);
     if (!pots.length) return;
     document.getElementById('modal-title').textContent = '🧪 포션 선택';
-    const content = document.getElementById('modal-content');
-    content.innerHTML = pots.map(([name,qty])=>
-        `<button class="modal-btn" onclick="usePotion('${name}')">${name} x${qty}</button>`
-    ).join('');
+    document.getElementById('modal-content').innerHTML =
+        pots.map(([name,qty])=>
+            `<button class="modal-btn" onclick="usePotion('${name}')">${name} ×${qty}</button>`
+        ).join('');
     document.getElementById('modal-overlay').classList.add('show');
 }
 
 function usePotion(name) {
     closeModal();
-    const g = gameState;
-    const pet = g.party[g.active];
-    g.potions[name]--;
-    let log = '';
-    if (name==='HP포션') {
-        const h=Math.floor(pet.max_hp*0.30); pet.hp=Math.min(pet.max_hp,pet.hp+h); log=`🧪 HP포션 +${h}`;
-    } else if (name==='신비한포션') {
-        pet.hp=pet.max_hp; log='✨ 완전 회복!';
-    } else if (name==='크리포션') {
-        pet.buffs.push({type:'crit_boost',value:1,duration:1}); log='⚗️ 크리 확정!';
-    } else if (name==='마력포션') {
-        pet.cur_mana=pet.max_mana; log='💙 마나 충전!';
-    } else if (name==='방무포션') {
-        pet.buffs.push({type:'armor_break_buff',value:1,duration:1}); log='🔴 방무 확정!';
-    } else if (name==='명중포션') {
-        pet.buffs.push({type:'sure_hit',value:0,duration:1}); log='🎯 명중 확정!';
-    }
-    showLog(log);
-    renderAll();
+    doAction('potion', {potion_name: name});
 }
 
 function openSwap() {
@@ -859,88 +1047,43 @@ function openSwap() {
     const others = g.party.filter((p,i)=>p.alive&&i!==g.active);
     if (!others.length) return;
     document.getElementById('modal-title').textContent = '🔄 펫 교체';
-    const content = document.getElementById('modal-content');
-    content.innerHTML = g.party.map((p,i)=>
-        p.alive && i!==g.active
-        ? `<button class="modal-btn" onclick="swapPet(${i})">${p.emoji} ${p.name} Lv.${p.level}  HP:${p.hp}/${p.max_hp}</button>`
-        : ''
-    ).join('');
+    document.getElementById('modal-content').innerHTML =
+        g.party.map((p,i)=>
+            p.alive && i!==g.active
+            ? `<button class="modal-btn" onclick="swapPet(${i})">${p.emoji||'🐾'} ${p.name} Lv.${p.level}  HP:${p.hp}/${p.max_hp}</button>`
+            : ''
+        ).join('');
     document.getElementById('modal-overlay').classList.add('show');
 }
 
 function swapPet(idx) {
     closeModal();
-    gameState.active = idx;
-    const pet = gameState.party[idx];
-    showLog(`🔄 ${pet.name} 출전!`);
-    renderAll();
+    doAction('swap', {swap_idx: idx});
 }
 
 function closeModal() {
     document.getElementById('modal-overlay').classList.remove('show');
 }
 
-function showResult() {
-    const g = gameState;
-    const screen = document.getElementById('result-screen');
-    if (g.phase === 'defeat') {
-        document.getElementById('result-title').textContent = '💀 패배';
-        document.getElementById('result-title').style.color = '#ff4444';
-        document.getElementById('btn-continue').style.display = 'none';
-    } else {
-        document.getElementById('result-title').textContent = '✅ 승리!';
-        document.getElementById('result-title').style.color = '#4ade80';
-        document.getElementById('btn-continue').style.display = 'block';
-    }
-    const floor = g.floor > 1 ? g.floor - 1 : g.floor;
-    document.getElementById('result-desc').textContent = `${floor}층 클리어 | 승리 ${g.wins}판 | 🍃${g.silver} 🌟${g.gold}`;
-    screen.classList.add('show');
-}
-
-function showError(msg) {
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:20px;color:#ff6060">${msg}</div>`;
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────────
-function getPetUrl(name, state='idle') {
-    // GitHub raw URL — 파일명: 토끼_idle.png 형식
-    const encoded = encodeURIComponent(name);
-    return `${BASE}/${encoded}_${state}.png`;
-}
-
-function getMonUrl(mon, state='idle') {
-    const name = mon.name;
-    const elem = mon.element || '물리';
-    const bosses = {
-        '심연의 용':{'idle':'%EC%8B%AC%EC%97%B0%EC%9D%98%20%EC%9A%A9_idle.png','attack':'%EC%8B%AC%EC%97%B0%EC%9D%98%20%EC%9A%A9_attack.png'},
-        '황금 심판자':{'idle':'%ED%99%A9%EA%B8%88%20%EC%8B%AC%ED%8C%90%EC%9E%90_idle.png','attack':'%ED%99%A9%EA%B8%88%20%EC%8B%AC%ED%8C%90%EC%9E%90_attack.png'},
-        '검은 왕':{'idle':'%EA%B2%80%EC%9D%80%20%EC%99%95_idle.png','attack':'%EA%B2%80%EC%9D%80%20%EC%99%95_attack.png'},
-    };
-    if (bosses[name]) return `${BASE}/${bosses[name][state]||bosses[name].idle}`;
-    if (mon.is_elite) return `${BASE}/${encodeURIComponent(elem)}%20%EB%B3%80%EC%A2%85_idle.png`;
-    const idx = (Math.abs(hashCode(name)) % 4) + 1;
-    const elemEnc = encodeURIComponent(elem);
-    return `${BASE}/${elemEnc}${idx}_idle.png`;
-}
-
-function hashCode(str) {
-    let h=0;
-    for(let i=0;i<str.length;i++) h=Math.imul(31,h)+str.charCodeAt(i)|0;
-    return h;
-}
-
+// ════════════════════════════════════════════════════════
+// 유틸
+// ════════════════════════════════════════════════════════
 function getElemAdv(a, b) {
-    const adv = {불:{풀:'🔼유리',얼음:'🔼유리',물:'🔽불리'},물:{불:'🔼유리',번개:'🔼유리'},번개:{물:'🔼유리'},풀:{물:'🔼유리',번개:'🔽불리'},어둠:{},얼음:{풀:'🔼유리'}};
+    const adv = {
+        불:{풀:'🔼유리',얼음:'🔼유리',물:'🔽불리'},물:{불:'🔼유리',번개:'🔽불리'},
+        번개:{물:'🔼유리',풀:'🔽불리'},풀:{물:'🔼유리',번개:'🔼유리',불:'🔽불리'},
+        어둠:{풀:'🔼유리',불:'🔽불리'},얼음:{불:'🔽불리',번개:'🔽불리',물:'🔼유리'},
+    };
     return (adv[a]&&adv[a][b]) || '➡보통';
 }
 
 function calcParryRate(pet, mon) {
-    const ps = pet.speed || 60;
-    const ms = mon.spd || 50;
+    const ps = pet.speed||60, ms = mon.spd||50;
     return Math.min(65, Math.floor(ps/(ps+ms)*100));
 }
 
 function fmtCoin(n) {
+    if (!n) return '0';
     if (n >= 100000000) return (n/100000000).toFixed(1)+'억';
     if (n >= 10000) return (n/10000).toFixed(0)+'만';
     return n.toLocaleString();
@@ -952,57 +1095,37 @@ function setAllDisabled(v) {
 
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
-function continueGame() {
-    // 결과 화면 닫고 다음 층 진행
-    document.getElementById('result-screen').classList.remove('show');
-    gameState.phase = 'battle';
-    // 다음 층 몬스터 생성
-    gameState.monster = makeTestMon(gameState.floor);
-    // 파티 소량 회복
-    gameState.party.forEach(p => {
-        if (p.alive) {
-            p.hp = Math.min(p.max_hp, p.hp + Math.floor(p.max_hp * 0.20));
-            p.cur_mana = Math.min(p.max_mana, p.cur_mana + Math.floor(p.max_mana * 0.25));
-        }
-    });
-    gameState.parry_available = false;
-    renderAll();
-    showLog(`⚔️ ${gameState.floor}층 도전!`);
+function showError(msg) {
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-size:18px;color:#ff6060;padding:20px">${msg}</div>`;
 }
 
-function endGame() {
-    // 종료 처리 — 결과 화면에 보상 표시
-    const g = gameState;
-    const floor = g.floor > 1 ? g.floor - 1 : g.floor;
-    const bet = g.bet || 0;
-    const mult = 0.5 + (floor / 30) * 3.0;
-    const reward = g.wins >= 3 ? Math.max(Math.floor(bet*0.5), Math.floor(bet*mult)) : 0;
-
-    document.getElementById('result-screen').classList.remove('show');
-
-    // 결과 embed 표시
-    const endEmbed = document.createElement('div');
-    endEmbed.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
-    endEmbed.innerHTML = `
-        <div style="font-size:48px">🏆</div>
-        <h2 style="font-size:32px;color:#FFD700">게임 종료!</h2>
-        <p style="font-size:20px;color:#ccc">${floor}층 클리어</p>
-        <p style="font-size:18px;color:#4ade80">💰 ${fmtCoin(reward)} 획득!</p>
-        <p style="font-size:16px;color:#aaa">🍃${g.silver} &nbsp; 🌟${g.gold} &nbsp; 승리 ${g.wins}판</p>
-        <p style="font-size:14px;color:#888;margin-top:8px">Discord 채널에서 보상이 지급됩니다.</p>
-        <button onclick="location.reload()" style="margin-top:16px;padding:12px 32px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer">🔄 처음으로</button>
-    `;
-    document.body.appendChild(endEmbed);
-
-    // Render API에 결과 전송
-    fetch('/api/game/result', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({token, result:'end'})
-    }).catch(e=>console.log(e));
+// 테스트용 더미 상태
+function getDemoState() {
+    return {
+        floor:1, wins:0, silver:0, gold:0, bet:10000, phase:'battle',
+        party:[{
+            name:'드래곤', emoji:'🔴', grade:'mythic', element:'불',
+            level:10, hp:700, max_hp:700, atk:230, def:140,
+            cur_mana:80, max_mana:130, ult_gauge:3, alive:true, speed:70,
+            skills:{
+                skill1:{name:'드래곤 클로', mana:20, dmg_mult:1.4, ult_gain:1},
+                skill2:{name:'화염 브레스', mana:40, dmg_mult:2.0, ult_gain:2},
+                ult:{name:'용의 분노', mana:0, dmg_mult:3.0},
+            },
+            skill_cd:{}, buffs:[], debuffs:[],
+        }],
+        active:0,
+        monster:{
+            name:'독 안개 슬라임', emoji:'🟢', element:'풀',
+            hp:400, max_hp:400, atk:60, def:20, spd:35,
+            is_boss:false, is_elite:false, level:0,
+            pattern:['점액 투척','독 안개'], pattern_idx:0, buffs:[], debuffs:[],
+        },
+        potions:{'HP포션':3}, parry_available:false,
+    };
 }
 
-// ── 시작 ─────────────────────────────────────────────────────────
+// ── 시작 ──────────────────────────────────────────────
 initGame();
 </script>
 </body>
