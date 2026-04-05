@@ -471,28 +471,33 @@ async def _on_kill(game, uid, logs, pet_dmg, pet_crit, active_games):
     _regen(game, 0.15)
     _tick_pet(game["party"][game["active"]])
 
-    # 이벤트층
+    # 이벤트층 (9, 19, 29...)
     if game["floor"] % 10 == 9:
         evt = _roll_event()
         game["current_event"] = evt; game["phase"] = "event"; game["floor"] = nf
         return {"phase":"event","game_state":_serialize(game),"logs":logs,
                 "event":evt,"pet_dmg":pet_dmg,"mon_dmg":0,"pet_crit":pet_crit,"mon_anim_delay":0}
 
-    # 상점 (3승마다)
+    # 3승마다 상점 (3, 6, 9승...)
     if game["wins"] % 3 == 0:
-        game["shop_items"] = _gen_shop(game); game["phase"] = "shop"; game["floor"] = nf
-        return {"phase":"shop","game_state":_serialize(game),"logs":logs,
-                "shop_items":game["shop_items"],"pet_dmg":pet_dmg,"mon_dmg":0,
-                "pet_crit":pet_crit,"mon_anim_delay":0}
-
-    # 결과 (3승 이상 달성)
-    if game["wins"] >= 3:
-        game["phase"] = "result"; game["floor"] = nf
+        game["shop_items"] = _gen_shop(game)
+        game["floor"] = nf
+        # 3승 이상이면 결과 화면 (continue → 상점)
+        # 3승 미만이면 바로 상점 (그런데 3%3==0이 첫 해당은 wins=3이므로 항상 3승 이상)
+        game["phase"] = "result"
         reward = _calc_reward(game)
         return {"phase":"result","game_state":_serialize(game),"logs":logs,
                 "reward":reward,"pet_dmg":pet_dmg,"mon_dmg":0,"pet_crit":pet_crit,"mon_anim_delay":0}
 
-    # 다음 층
+    # 3승 이상 (3의 배수 아닌 경우) — 결과 화면
+    if game["wins"] >= 3:
+        game["phase"] = "result"; game["floor"] = nf
+        game["shop_items"] = []   # 상점 없음
+        reward = _calc_reward(game)
+        return {"phase":"result","game_state":_serialize(game),"logs":logs,
+                "reward":reward,"pet_dmg":pet_dmg,"mon_dmg":0,"pet_crit":pet_crit,"mon_anim_delay":0}
+
+    # 3승 미만 — 다음 층 바로
     game["floor"] = nf
     game["monster"] = _build_monster(nf, game.get("top_grade","common"))
     game["phase"] = "battle"
@@ -578,6 +583,12 @@ async def do_action(req: ActionReq):
             return {"phase":"ended","reward":reward,"floor":game["floor"]-1,
                     "msg":f"💰 {reward:,} 코인 획득!"}
         if action == "continue":
+            # 상점이 준비돼 있으면 상점 먼저
+            if game.get("shop_items"):
+                game["phase"] = "shop"
+                return {"phase":"shop","game_state":_serialize(game),
+                        "logs":["🏪 상점에 들르세요!"],
+                        "shop_items":game["shop_items"],"mon_anim_delay":0}
             game["monster"] = _build_monster(game["floor"], game.get("top_grade","common"))
             game["phase"] = "battle"; _regen(game, 0.20)
             return {"phase":"battle","game_state":_serialize(game),
@@ -588,6 +599,7 @@ async def do_action(req: ActionReq):
     if game["phase"] == "shop":
         if action == "skip_shop":
             game["phase"] = "battle"
+            game["shop_items"] = []
             game["monster"] = _build_monster(game["floor"], game.get("top_grade","common"))
             _regen(game, 0.10)
             return {"phase":"battle","game_state":_serialize(game),
