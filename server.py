@@ -4,7 +4,6 @@ from fastapi import FastAPI,HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-sys.path.insert(0,os.path.dirname(os.path.dirname(__file__)))
 app=FastAPI()
 app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_methods=["*"],allow_headers=["*"])
 HTML_PATH=os.path.join(os.path.dirname(__file__),"game.html")
