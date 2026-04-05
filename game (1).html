@@ -714,8 +714,23 @@ async function processResult(data) {
         return;
     }
 
-    // 상점/이벤트는 renderAll이 처리
+    // 상점
+    if (data.phase === 'shop') {
+        document.getElementById('result-screen').classList.remove('show');
+        showShopScreen();
+        return;
+    }
+    // 이벤트
+    if (data.phase === 'event') {
+        document.getElementById('result-screen').classList.remove('show');
+        showEventScreen();
+        return;
+    }
+    // 일반 전투 — 결과 화면 닫고 렌더
+    document.getElementById('result-screen').classList.remove('show');
     renderAll();
+    actionLocked = false;
+    renderButtons();
 }
 
 // ── 애니메이션 ────────────────────────────────────────────────
