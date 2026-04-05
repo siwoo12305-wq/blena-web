@@ -249,8 +249,8 @@ body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; ov
         <div id="battle-bg"></div>
 
         <!-- 스프라이트 -->
-        <img id="pet-sprite" class="sprite" src="" alt="">
-        <img id="mon-sprite" class="sprite" src="" alt="">
+        <canvas id="pet-sprite" class="sprite" width="200" height="200"></canvas>
+        <canvas id="mon-sprite" class="sprite" width="200" height="200"></canvas>
 
         <!-- 이펙트 -->
         <div id="effect-layer"></div>
@@ -398,40 +398,108 @@ const GRADE_COLOR = {
 };
 const ELEM_COLOR = {불:'#ef4444',물:'#3b82f6',번개:'#eab308',풀:'#22c55e',어둠:'#8b5cf6',얼음:'#93c5fd',물리:'#9ca3af'};
 
-function getPetUrl(name, state='idle') {
-    if (PET_IMG[name]) return `${CDN}/${PET_IMG[name][state] || PET_IMG[name].idle}`;
-    return null;
+// ════════════════════════════════════════════════════════
+// canvas 스프라이트 (검은 배경 없음)
+// ════════════════════════════════════════════════════════
+const PET_PAL = {
+    토끼:{b:'#e0b4cc',a:'#ffaabb',e:'#ff2255'},강아지:{b:'#d4a870',a:'#b08040',e:'#331100'},
+    고양이:{b:'#909090',a:'#c09090',e:'#22cc44'},다람쥐:{b:'#b48030',a:'#d4a238',e:'#110000'},
+    돼지:{b:'#ffb4b0',a:'#ff8890',e:'#cc2244'},양:{b:'#f0f0f0',a:'#c8b8b0',e:'#334433'},
+    말:{b:'#a07846',a:'#785028',e:'#221100'},늑대:{b:'#646470',a:'#484860',e:'#ff4400'},
+    고릴라:{b:'#3c2d20',a:'#503820',e:'#ff5500'},코끼리:{b:'#8c8c96',a:'#787882',e:'#334466'},
+    판다:{b:'#f0f0f0',a:'#141414',e:'#111111'},곰:{b:'#50371e',a:'#644628',e:'#220000'},
+    독수리:{b:'#504630',a:'#ffb400',e:'#ff6600'},샤크:{b:'#507898',a:'#3c6488',e:'#001133'},
+    악어:{b:'#32783c',a:'#286430',e:'#ff5500'},사자:{b:'#c89632',a:'#ffc850',e:'#ff8800'},
+    호랑이:{b:'#d46e1e',a:'#111111',e:'#ff4400'},유니콘:{b:'#f0c8ff',a:'#ffb4dc',e:'#aa44ff'},
+    티렉스:{b:'#3c7830',a:'#50a040',e:'#ff2200'},피닉스:{b:'#dc5014',a:'#ffa000',e:'#ffff00'},
+    오니:{b:'#b41e1e',a:'#ff5000',e:'#ffff00'},드래곤:{b:'#b43218',a:'#dc5014',e:'#ff0000'},
+    바이퍼:{b:'#14b464',a:'#0af078',e:'#00ff88'},제우스:{b:'#f0dc50',a:'#ffff78',e:'#0044ff'},
+    하데스:{b:'#281450',a:'#643296',e:'#aa00ff'},
+    _def:{b:'#9664b4',a:'#8250a0',e:'#ff88ff'},
+};
+const MON_KEY_COL = {
+    슬라임:'#3cc850',고블린:'#50a03c',박쥐:'#503264',거북:'#3c8250',전갈:'#8c6420',
+    까마귀:'#32283c',사슴:'#78582e',벌레:'#b45014',여우:'#b47820',개구리:'#3ca03c',
+    벌:'#b49614',유령:'#b4a0dc',해골:'#c8bea8',멧돼지:'#785040',도적:'#5a4632',
+    기사:'#828296',물고기:'#3c78b4',드워프:'#78582e',도마뱀:'#3c9650',골렘:'#968c82',
+    버섯:'#b43c8c',늑대:'#645058',거미:'#503c50',양:'#c8beb4',도깨비:'#c8501e',
+    심연:'#281450',광폭:'#641e96',황금:'#c8aa14',블러드:'#b4141e',아이스:'#78b4dc',
+    쉐도우:'#321e46',파괴자:'#5064c8',검은:'#14101e',_def:'#a03232',
+};
+function _getMonCol(name){for(const[k,c]of Object.entries(MON_KEY_COL))if(name.includes(k))return c;return MON_KEY_COL._def;}
+function _shade(hex,f=0.6){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${~~(r*f)},${~~(g*f)},${~~(b*f)})`;}
+
+function drawPetSprite(id, name, hpRatio=1.0, attack=false) {
+    const cv=document.getElementById(id); if(!cv||!cv.getContext)return;
+    const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H);
+    const p=PET_PAL[name]||PET_PAL._def;
+    const body=hpRatio<0.3?_shade(p.b,0.7):p.b, acc=hpRatio<0.3?_shade(p.a,0.7):p.a, eye=hpRatio<=0?'#ff2222':p.e;
+    const cx=attack?W*0.58:W*0.50, cy=H*0.54, s=Math.min(W,H)*0.34;
+    // 그림자
+    ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';
+    ctx.beginPath();ctx.ellipse(cx,cy+s*0.55,s*0.65,s*0.15,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    // 몸통
+    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx,cy,s*0.70,s*0.58,0,0,Math.PI*2);ctx.fill();
+    // 머리
+    const hx=cx+s*0.28,hy=cy-s*0.32,hr=s*0.36;
+    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*0.9,0,0,Math.PI*2);ctx.fill();
+    // 귀
+    ctx.fillStyle=acc;
+    ctx.beginPath();ctx.ellipse(hx-hr*0.5,hy-hr*0.85,hr*0.22,hr*0.38,-0.3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(hx+hr*0.5,hy-hr*0.85,hr*0.22,hr*0.38,0.3,0,Math.PI*2);ctx.fill();
+    // 눈
+    ctx.fillStyle=eye;ctx.beginPath();ctx.ellipse(hx-hr*0.28,hy-hr*0.08,hr*0.13,hr*0.16,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx-hr*0.24,hy-hr*0.13,hr*0.05,hr*0.06,0,0,Math.PI*2);ctx.fill();
+    // 공격 포즈 (앞발)
+    if(attack){ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx+s*0.65,cy-s*0.05,s*0.22,s*0.14,0.5,0,Math.PI*2);ctx.fill();}
 }
 
-function setPetSprite(name, state='idle', grade='common') {
-    const el = document.getElementById('pet-sprite');
-    const url = getPetUrl(name, state);
-    if (url) {
-        el.src = url;
-        el.style.background = 'none';
-        el.onerror = () => { el.src=''; el.style.background = GRADE_COLOR[grade]||'#6b7280'; };
-    } else {
-        el.src = '';
-        el.style.background = GRADE_COLOR[grade] || '#6b7280';
+function drawMonSprite(id, name, elem, hpRatio=1.0, isBoss=false, isElite=false) {
+    const cv=document.getElementById(id); if(!cv||!cv.getContext)return;
+    const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H);
+    const baseHex=_getMonCol(name), body=hpRatio<0.3?_shade(baseHex,0.7):baseHex;
+    const eyeC=isBoss?'#ff0000':isElite?'#cc00ff':'#ff3300';
+    const cx=W*0.50, cy=H*0.50, s=Math.min(W,H)*(isBoss?0.40:isElite?0.37:0.33);
+    // 오라
+    if(isBoss||isElite){
+        const g2=ctx.createRadialGradient(cx,cy,s*0.3,cx,cy,s*1.1);
+        g2.addColorStop(0,isBoss?'rgba(255,68,0,0.25)':'rgba(170,0,255,0.2)');g2.addColorStop(1,'transparent');
+        ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(cx,cy,s*1.1,s*1.1,0,0,Math.PI*2);ctx.fill();
+    }
+    // 그림자
+    ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';
+    ctx.beginPath();ctx.ellipse(cx,cy+s*0.60,s*0.68,s*0.15,0,0,Math.PI*2);ctx.fill();ctx.restore();
+    // 몸통
+    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx,cy,s*0.75,s*0.65,0,0,Math.PI*2);ctx.fill();
+    // 머리 (왼쪽)
+    const hx=cx-s*0.28,hy=cy-s*0.28,hr=s*0.38;
+    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*0.88,0,0,Math.PI*2);ctx.fill();
+    // 보스/엘리트 뿔
+    if(isBoss){
+        ctx.fillStyle='#ff8800';
+        ctx.beginPath();ctx.moveTo(hx-hr*0.2,hy-hr*0.8);ctx.lineTo(hx-hr*0.5,hy-hr*1.6);ctx.lineTo(hx+hr*0.1,hy-hr*0.8);ctx.fill();
+        ctx.beginPath();ctx.moveTo(hx+hr*0.3,hy-hr*0.7);ctx.lineTo(hx,hy-hr*1.4);ctx.lineTo(hx+hr*0.6,hy-hr*0.7);ctx.fill();
+    }else if(isElite){
+        ctx.fillStyle='#cc44ff';
+        ctx.beginPath();ctx.moveTo(hx,hy-hr*0.9);ctx.lineTo(hx-hr*0.3,hy-hr*1.5);ctx.lineTo(hx+hr*0.3,hy-hr*1.5);ctx.fill();
+    }
+    // 눈
+    ctx.fillStyle=eyeC;ctx.beginPath();ctx.ellipse(hx+hr*0.22,hy-hr*0.08,hr*0.15,hr*0.18,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx+hr*0.26,hy-hr*0.12,hr*0.05,hr*0.06,0,0,Math.PI*2);ctx.fill();
+    // 이빨
+    const det=isBoss?'#ff4400':isElite?'#cc44ff':_shade(baseHex,0.55);
+    ctx.fillStyle=det;ctx.beginPath();ctx.moveTo(hx+hr*0.15,hy+hr*0.30);ctx.lineTo(hx+hr*0.25,hy+hr*0.55);ctx.lineTo(hx+hr*0.35,hy+hr*0.30);ctx.fill();
+    // 상처 (HP 낮음)
+    if(hpRatio<0.3&&hpRatio>0){
+        ctx.save();ctx.strokeStyle='#ff2222';ctx.lineWidth=2;ctx.globalAlpha=0.7;
+        ctx.beginPath();ctx.moveTo(cx-s*0.2,cy-s*0.3);ctx.lineTo(cx+s*0.1,cy+s*0.1);ctx.stroke();ctx.restore();
     }
 }
 
-function setMonSprite(mon) {
-    const el  = document.getElementById('mon-sprite');
-    const col = ELEM_COLOR[mon.element] || '#9ca3af';
-    const dim = mon.is_boss ? 'brightness(0.8) saturate(1.5)' : '';
-    el.src = '';
-    el.style.background = col;
-    el.style.filter = dim || '';
-    // 보스/엘리트는 border로 강조
-    if (mon.is_boss)       el.style.border = '3px solid #ff4400';
-    else if (mon.is_elite) el.style.border = '3px solid #aa44ff';
-    else                   el.style.border = 'none';
-
-    // 이름 텍스트 오버레이 (emoji)
-    const ov = document.getElementById('mon-emoji-overlay');
-    if (ov) ov.textContent = mon.emoji || '👹';
-}
+// getPetUrl 호환용 (혹시 남은 참조)
+function getPetUrl(name, state='idle') { return null; }
 
 // ── 초기화 ────────────────────────────────────────────────────
 async function initGame() {
@@ -443,8 +511,7 @@ async function initGame() {
         }
         gameState = await r.json();
     } catch(e) {
-        console.warn('API 없음 → 테스트 모드');
-        gameState = getDemoState();
+        showError('서버에 연결할 수 없습니다.<br>Discord에서 <b>/블레나 시작</b> 후 다시 시도하세요.<br><small>' + e.message + '</small>');
     }
     renderAll();
 }
@@ -479,9 +546,9 @@ function renderAll() {
     const bgMap = {normal:'/normal_field.png', boss:'/Boss_field.png', elite:'/normal_field.png'};
     document.getElementById('battle-bg').style.backgroundImage = `url('${BASE}${bgMap[bgKey]}')`;
 
-    // 스프라이트 — img + 색상 폴백 (검은 배경 없음)
-    setPetSprite(pet.name, 'idle', pet.grade);
-    setMonSprite(mon);
+    // ★ canvas 스프라이트 (검은 배경 없음)
+    drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
+    drawMonSprite('mon-sprite', mon.name, mon.element, mon.hp/mon.max_hp, mon.is_boss, mon.is_elite);
 
     // 펫 UI
     document.getElementById('pet-name').textContent =
@@ -563,28 +630,32 @@ async function doAction(action, extra={}) {
     try {
         await playActionAnim(action);
 
-        let data = null;
-        try {
-            const r = await fetch(`${API}/api/game/action`, {
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({token, action, extra})
-            });
-            if (r.ok) {
-                data = await r.json();
-            } else {
-                console.warn('API 오류 → 로컬 시뮬레이션');
-                data = simulateAction(action, extra);
-            }
-        } catch(e) {
-            console.warn('서버 없음 → 로컬 시뮬레이션');
-            data = simulateAction(action, extra);
+        const r = await fetch(`${API}/api/game/action`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({token, action, extra})
+        });
+
+        if (!r.ok) {
+            let msg = '서버 오류';
+            try { const e = await r.json(); msg = e.detail || msg; } catch(_) {}
+            showLog('⚠️ ' + msg);
+            actionLocked = false;
+            setAllDisabled(false);
+            renderButtons();
+            return;
         }
 
+        const data = await r.json();
         if (data) await processResult(data);
 
     } catch(e) {
         console.error('[doAction]', e);
+        showLog('⚠️ 서버 연결 실패: ' + e.message);
+        actionLocked = false;
+        setAllDisabled(false);
+        renderButtons();
+        return;
     }
 
     actionLocked = false;
@@ -654,8 +725,8 @@ async function playActionAnim(action) {
 
     if (['skill1','skill2','ult','secret'].includes(action)) {
         const petEl = document.getElementById('pet-sprite');
-        setPetSprite(pet.name, 'attack', pet.grade);
         petEl.classList.add('attack');
+        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, true);
         showEffect(pet.element);
         await sleep(350);
 
@@ -667,7 +738,7 @@ async function playActionAnim(action) {
         document.getElementById('battle-bg').classList.remove('hit-flash');
 
         petEl.classList.remove('attack');
-        setPetSprite(pet.name, 'idle', pet.grade);
+        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
 
     } else if (action === 'parry') {
         showEffectText('⚡ 패링!', '#f97316'); await sleep(200);
@@ -691,6 +762,9 @@ async function playMonsterAnim(dmg, delayMs=800) {
     showDmgNumber(dmg, false, true);
     await sleep(300);
     petEl.style.filter = '';
+    // canvas 펫 다시 그리기
+    const _ap = gameState?.party?.[gameState?.active];
+    if (_ap) drawPetSprite('pet-sprite', _ap.name, _ap.hp/_ap.max_hp, false);
 }
 
 // ── 결과/상점/이벤트 화면 ────────────────────────────────────
