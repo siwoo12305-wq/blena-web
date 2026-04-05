@@ -1111,6 +1111,28 @@ function simulateAction(action, extra={}) {
     const logs = [];
     let pet_dmg = 0, pet_crit = false, mon_dmg = 0;
 
+    // 결과 화면 액션
+    if (action === 'end' || action === 'give_up') {
+        g.phase = 'ended';
+        return {phase:'ended', reward:0, floor:g.floor-1, msg:'(테스트 모드 — 실제 보상 없음)'};
+    }
+    if (action === 'continue') {
+        g.monster = makeTestMon(g.floor, g.top_grade||'common');
+        g.phase = 'battle';
+        return {phase:'battle', game_state:g, logs:[`⚔️ ${g.floor}층 도전!`], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+    }
+    if (action === 'skip_shop') {
+        g.phase = 'battle';
+        g.monster = makeTestMon(g.floor, g.top_grade||'common');
+        return {phase:'battle', game_state:g, logs:['⏭️ 상점 스킵'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+    }
+    if (action === 'event_accept') {
+        g.phase = 'battle';
+        g.monster = makeTestMon(g.floor, g.top_grade||'common');
+        g.current_event = null;
+        return {phase:'battle', game_state:g, logs:['✅ 이벤트 수락!'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
+    }
+
     if (['skill1','skill2','ult','secret'].includes(action)) {
         const skill = pet.skills?.[action] || pet.skills?.skill1;
         if (!skill) return {game_state:g, logs:['스킬 없음'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
@@ -1204,37 +1226,56 @@ function simulateAction(action, extra={}) {
     // 펫 사망
     if (pet.hp <= 0) {
         pet.alive = false;
-        const nxt = g.party.findIndex((p,i)=>p.alive&&i!==g.active);
-        if (nxt >= 0) { g.active=nxt; logs.push(`🔄 ${g.party[nxt].name} 출전!`); }
-        else { g.phase='defeat'; return {phase:'defeat',game_state:g,logs,pet_dmg,pet_crit,mon_dmg,mon_anim_delay:0}; }
+        logs.push(`💀 ${pet.name} 전투불능!`);
+        // 살아있는 다른 펫 찾기 (인덱스 명시적으로 비교)
+        let nxt = -1;
+        for (let i = 0; i < g.party.length; i++) {
+            if (g.party[i].alive && i !== g.active) { nxt = i; break; }
+        }
+        if (nxt >= 0) {
+            g.active = nxt;
+            logs.push(`🔄 ${g.party[nxt].name} 출전!`);
+        } else {
+            // 전멸 — 패배 처리
+            g.phase = 'defeat';
+            return {phase:'defeat', game_state:g, logs, pet_dmg, pet_crit, mon_dmg, mon_anim_delay:0};
+        }
     }
 
     return {phase:'battle', game_state:g, logs, pet_dmg, pet_crit, mon_dmg, mon_anim_delay:1000};
 }
 
 function makeTestMon(floor, topGrade='common') {
-    const gradeScale = {common:1.0,uncommon:1.8,rare:3.5,legendary:6.0,mythic:9.0,
-                        spirit:13.0,immortal:18.0,celestial:25.0,admin:40.0};
-    const gm = gradeScale[topGrade] || 1.0;
-    const fm = 1.0 + (floor-1)*0.06;
-    const mult = fm * gm;
+    // 등급별 베이스 HP (1층 기준, 2~3턴 안에 잡을 수 있는 수준)
+    const gradeBase = {
+        common:150, uncommon:280, rare:500, legendary:900,
+        mythic:1400, spirit:2000, immortal:2800, celestial:4000, admin:6000
+    };
+    const baseHp  = gradeBase[topGrade] || 150;
+    const baseAtk = Math.floor(baseHp * 0.22);
+    const baseDef = Math.floor(baseHp * 0.06);
+
+    const fm = 1.0 + (floor-1)*0.08;  // 층당 8% 증가
     const names = ['독 안개 슬라임','붉은 박쥐','철갑 거북','불꽃 도깨비','사막 전갈','얼음 여우'];
     const elems = ['불','물','번개','풀','어둠','얼음','물리'];
     const name  = names[Math.floor(Math.random()*names.length)];
     const elem  = elems[Math.floor(Math.random()*elems.length)];
     const isBoss  = floor % 10 === 0;
     const isElite = floor % 5 === 0 && !isBoss;
-    const bm = isBoss ? 1.5 : (isElite ? 1.2 : 1.0);
+    const bm = isBoss ? 2.0 : (isElite ? 1.4 : 1.0);
+
+    const hp  = Math.floor(baseHp  * fm * bm);
+    const atk = Math.floor(baseAtk * fm * bm);
+    const def = Math.floor(baseDef * fm);
+
     return {
         name, emoji:'👹', element:elem,
-        hp:   Math.floor(120*mult*bm),
-        max_hp:Math.floor(120*mult*bm),
-        atk:  Math.floor(35*mult*bm),
-        def:  Math.floor(10*mult),
+        hp, max_hp:hp, atk, def,
         spd:50, is_boss:isBoss, is_elite:isElite,
         level:Math.floor((floor-1)/10),
         pattern:['기본 공격','강타'], pattern_idx:0,
-        buffs:[], debuffs:[], silver:Math.floor(Math.random()*3)+1, gold:isBoss?1:0,
+        buffs:[], debuffs:[],
+        silver:Math.floor(Math.random()*3)+1, gold:isBoss?1:0,
     };
 }
 
@@ -1260,6 +1301,7 @@ function getDemoState() {
             pattern:['점액 투척','독 안개'], pattern_idx:0, buffs:[], debuffs:[],
         },
         potions:{'HP포션':3}, parry_available:false,
+        top_grade:'common',
     };
 }
 
