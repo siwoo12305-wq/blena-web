@@ -2,1161 +2,592 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>BLACK ARENA TOWER</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#0a0a0f; color:#fff; font-family:'Noto Sans KR',sans-serif; overflow:hidden; }
-#game-container { width:100vw; height:100vh; display:flex; flex-direction:column; }
-
-/* 상단 HUD */
-#hud {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:8px 20px; background:rgba(0,0,0,0.7);
-    border-bottom:1px solid rgba(255,200,50,0.3);
-    height:48px; flex-shrink:0;
-}
-#hud .floor { font-size:20px; font-weight:bold; color:#FFD700; }
-#hud .resources { display:flex; gap:16px; font-size:14px; }
-#hud .elem-info { font-size:13px; color:#FFD700; }
-
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflow:hidden;height:100dvh;display:flex;flex-direction:column}
+/* HUD */
+#hud{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(0,0,0,.8);border-bottom:1px solid rgba(255,200,50,.3);flex-shrink:0;height:44px}
+#hud .floor{font-size:17px;font-weight:700;color:#FFD700}
+#hud .res{display:flex;gap:12px;font-size:13px}
 /* 전투 화면 */
-#battle-area {
-    flex:1; position:relative; overflow:hidden;
-}
-#battle-bg {
-    position:absolute; inset:0;
-    background-size:cover; background-position:center;
-    transition:filter 0.3s;
-}
-#battle-bg.hit-flash { filter:brightness(1.8) saturate(2); }
-
-/* 스프라이트 */
-.sprite {
-    position:absolute;
-    transition:transform 0.15s ease-out, filter 0.1s;
-}
-#pet-sprite {
-    width:200px; height:200px;
-    bottom:160px; left:80px;
-    image-rendering:pixelated;
-}
-#mon-sprite {
-    width:200px; height:200px;
-    top:80px; right:80px;
-    image-rendering:pixelated;
-    transform:scaleX(-1); /* 왼쪽 바라봄 */
-}
-#mon-sprite.hit {
-    filter:brightness(2) saturate(0) sepia(1) hue-rotate(300deg);
-    animation:hit-shake 0.3s ease-out;
-}
-#pet-sprite.attack { animation:pet-attack 0.4s ease-out; }
-/* 모바일 */
-@media (max-width:600px) {
-    #pet-sprite { width:120px; height:120px; bottom:130px; left:8px; }
-    #mon-sprite { width:120px; height:120px; top:55px; right:8px; }
-    #pet-ui { width:calc(100vw - 20px); left:10px; bottom:6px; }
-    #mon-ui { width:calc(100vw - 20px); right:10px; top:6px; font-size:11px; }
-    #skill-row1, #skill-row2 { gap:3px; padding:4px 6px 2px; }
-    .skill-btn { font-size:11px; padding:0 4px; }
-    .skill-btn .btn-name { font-size:11px; }
-    #hud { padding:4px 8px; height:38px; }
-    #hud .floor { font-size:14px; }
-    #hud .resources { font-size:10px; gap:6px; }
-}
-@keyframes hit-shake {
-    0%{transform:scaleX(-1) translateX(0)} 25%{transform:scaleX(-1) translateX(-15px)}
-    50%{transform:scaleX(-1) translateX(10px)} 75%{transform:scaleX(-1) translateX(-8px)}
-    100%{transform:scaleX(-1) translateX(0)}
-}
-@keyframes pet-attack {
-    0%{transform:translateX(0)} 30%{transform:translateX(60px)}
-    60%{transform:translateX(40px)} 100%{transform:translateX(0)}
-}
-@keyframes mon-attack {
-    0%{transform:scaleX(-1) translateX(0)} 30%{transform:scaleX(-1) translateX(-60px)}
-    60%{transform:scaleX(-1) translateX(-40px)} 100%{transform:scaleX(-1) translateX(0)}
-}
-#mon-sprite.mon-attack { animation:mon-attack 0.4s ease-out; }
-
-/* 이펙트 레이어 */
-#effect-layer {
-    position:absolute; inset:0; pointer-events:none;
-    display:flex; align-items:center; justify-content:center;
-}
-.effect-text {
-    font-size:42px; font-weight:900; text-shadow:0 0 20px currentColor;
-    animation:effect-rise 0.8s ease-out forwards;
-    position:absolute;
-}
-@keyframes effect-rise {
-    0%{opacity:1;transform:translateY(0) scale(1.2)} 100%{opacity:0;transform:translateY(-80px) scale(0.8)}
-}
-.dmg-number {
-    position:absolute; font-size:38px; font-weight:900;
-    text-shadow:2px 2px 0 #000, 0 0 20px currentColor;
-    animation:dmg-float 0.9s ease-out forwards;
-    pointer-events:none;
-}
-@keyframes dmg-float {
-    0%{opacity:1;transform:translateY(0) scale(1.3)} 100%{opacity:0;transform:translateY(-60px) scale(0.9)}
-}
-
-/* HP/MP 바 — 펫 */
-#pet-ui {
-    position:absolute; bottom:10px; left:40px;
-    width:420px; background:rgba(0,0,0,0.75);
-    border:1px solid rgba(255,255,255,0.15);
-    border-radius:8px; padding:10px 12px;
-}
-#pet-ui .pet-name { font-size:15px; font-weight:bold; color:#90FF90; margin-bottom:6px; }
-.bar-wrap { margin:4px 0; }
-.bar-label { font-size:11px; color:#aaa; margin-bottom:2px; }
-.bar-bg { background:#1a1a1a; border-radius:4px; height:16px; position:relative; overflow:hidden; }
-.bar-fill { height:100%; border-radius:4px; transition:width 0.4s ease-out; }
-.bar-text { position:absolute; left:6px; top:0; height:100%; display:flex; align-items:center; font-size:11px; color:#fff; font-weight:bold; }
-.hp-fill { background:linear-gradient(90deg,#22c55e,#4ade80); }
-.hp-fill.low { background:linear-gradient(90deg,#dc2626,#ef4444); }
-.hp-fill.mid { background:linear-gradient(90deg,#ca8a04,#eab308); }
-.mp-fill { background:linear-gradient(90deg,#2563eb,#60a5fa); }
-.def-fill { background:linear-gradient(90deg,#1d4ed8,#93c5fd); }
-/* ULT 게이지 */
-#ult-gauge { display:flex; gap:3px; margin-top:6px; }
-.ult-slot {
-    flex:1; height:12px; border-radius:3px;
-    background:#1a1a1a; border:1px solid #666;
-    transition:background 0.3s;
-}
-.ult-slot.filled { background:linear-gradient(90deg,#fbbf24,#f59e0b); box-shadow:0 0 6px #fbbf24; }
-
-/* HP 바 — 몬스터 */
-#mon-ui {
-    position:absolute; top:55px; right:20px;
-    width:440px; background:rgba(0,0,0,0.75);
-    border:1px solid rgba(255,255,255,0.15);
-    border-radius:8px; padding:10px 12px;
-}
-#mon-ui .mon-name { font-size:15px; font-weight:bold; color:#FF7070; margin-bottom:6px; }
-
-/* 스킬 버튼 영역 */
-#skill-area {
-    height:160px; flex-shrink:0;
-    background:rgba(0,0,0,0.85);
-    border-top:1px solid rgba(255,200,50,0.2);
-    display:flex; flex-direction:column; gap:0;
-}
-#skill-row1, #skill-row2 {
-    flex:1; display:flex; gap:6px; padding:6px 10px 3px;
-}
-.skill-btn {
-    flex:1; border:none; border-radius:8px; cursor:pointer;
-    font-size:13px; font-weight:bold; color:#fff;
-    padding:0 8px; transition:all 0.15s;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:2px; position:relative; overflow:hidden;
-}
-.skill-btn:hover:not(:disabled) { transform:translateY(-2px); filter:brightness(1.2); }
-.skill-btn:active:not(:disabled) { transform:translateY(1px); }
-.skill-btn:disabled { opacity:0.4; cursor:not-allowed; }
-.skill-btn .btn-name { font-size:13px; }
-.skill-btn .btn-cost { font-size:10px; opacity:0.8; }
-.btn-atk   { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
-.btn-atk2  { background:linear-gradient(135deg,#1e3a8a,#2563eb); }
-.btn-def   { background:linear-gradient(135deg,#374151,#6b7280); }
-.btn-opp   { background:linear-gradient(135deg,#14532d,#16a34a); }
-.btn-ult   { background:linear-gradient(135deg,#713f12,#d97706); box-shadow:0 0 12px #f59e0b; }
-.btn-parry { background:linear-gradient(135deg,#7c2d12,#ea580c); animation:parry-pulse 0.6s infinite alternate; }
-@keyframes parry-pulse { from{box-shadow:0 0 6px #ea580c} to{box-shadow:0 0 20px #ea580c, 0 0 40px #f97316} }
-.btn-give  { background:linear-gradient(135deg,#1c1c1c,#374151); }
-.btn-swap  { background:linear-gradient(135deg,#1e1b4b,#4338ca); }
-.btn-pot   { background:linear-gradient(135deg,#14532d,#15803d); }
-
-/* 전투 로그 */
-#battle-log {
-    position:absolute; bottom:170px; left:50%;
-    transform:translateX(-50%);
-    max-width:600px; width:90%;
-    text-align:center; pointer-events:none;
-}
-.log-line {
-    font-size:18px; font-weight:bold;
-    text-shadow:1px 1px 0 #000, 0 0 10px rgba(255,255,255,0.3);
-    animation:log-fade 2.5s ease-out forwards;
-    display:block;
-}
-@keyframes log-fade { 0%{opacity:1;transform:scale(1.1)} 70%{opacity:1} 100%{opacity:0;transform:scale(0.95)} }
-
-/* 모달 (포션/교체 선택) */
-#modal-overlay {
-    display:none; position:fixed; inset:0;
-    background:rgba(0,0,0,0.7); z-index:100;
-    align-items:center; justify-content:center;
-}
-#modal-overlay.show { display:flex; }
-#modal-box {
-    background:#1a1a2e; border:1px solid rgba(255,200,50,0.4);
-    border-radius:12px; padding:20px; min-width:300px;
-    max-width:90vw;
-}
-#modal-box h3 { color:#FFD700; margin-bottom:12px; font-size:16px; }
-.modal-btn {
-    display:block; width:100%; margin:6px 0;
-    padding:10px 16px; background:rgba(255,255,255,0.1);
-    border:1px solid rgba(255,255,255,0.2); border-radius:8px;
-    color:#fff; cursor:pointer; font-size:14px; text-align:left;
-    transition:background 0.15s;
-}
-.modal-btn:hover { background:rgba(255,255,255,0.2); }
-.modal-cancel { background:rgba(255,50,50,0.2); border-color:rgba(255,50,50,0.4); }
-
+#arena{flex:1;position:relative;overflow:hidden;min-height:0}
+#bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .3s}
+#bg.flash{filter:brightness(2) saturate(2)}
+/* 스프라이트 — canvas */
+#pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;image-rendering:pixelated}
+#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;image-rendering:pixelated}
+/* 히트 쉐이크 */
+#mon-cv.hit{animation:mhit .3s}
+@keyframes mhit{0%,100%{transform:translateX(0)}25%{transform:translateX(-12px)}75%{transform:translateX(10px)}}
+#pet-cv.attack{animation:patk .35s}
+@keyframes patk{0%,100%{transform:translateX(0)}40%{transform:translateX(55px)}}
+#mon-cv.mon-attack{animation:matk .35s}
+@keyframes matk{0%,100%{transform:translateX(0)}40%{transform:translateX(-55px)}}
+/* 이펙트 */
+#fx{position:absolute;inset:0;pointer-events:none}
+.fx-txt{position:absolute;font-size:36px;font-weight:900;animation:frise .8s forwards;pointer-events:none;text-shadow:0 0 16px currentColor}
+@keyframes frise{0%{opacity:1;transform:translateY(0) scale(1.2)}100%{opacity:0;transform:translateY(-70px) scale(.9)}}
+.dmg{position:absolute;font-size:34px;font-weight:900;animation:frise .9s forwards;pointer-events:none;text-shadow:2px 2px 0 #000}
+/* 로그 */
+#log{position:absolute;bottom:148px;left:50%;transform:translateX(-50%);width:90%;max-width:540px;text-align:center;pointer-events:none}
+.log-line{display:block;font-size:16px;font-weight:700;text-shadow:1px 1px 0 #000;animation:log-fade 2.5s forwards}
+@keyframes log-fade{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
+/* 펫 UI */
+#pet-ui{position:absolute;bottom:6px;left:10px;width:320px;background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:8px 10px}
+.pname{font-size:13px;font-weight:700;color:#90FF90;margin-bottom:5px}
+.bar-bg{background:#1a1a1a;border-radius:3px;height:13px;position:relative;overflow:hidden;margin:3px 0}
+.bar-fill{height:100%;border-radius:3px;transition:width .4s}
+.bar-txt{position:absolute;left:5px;top:0;height:100%;display:flex;align-items:center;font-size:10px;color:#fff;font-weight:700}
+.hp-bar{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.hp-bar.low{background:linear-gradient(90deg,#dc2626,#ef4444)}
+.hp-bar.mid{background:linear-gradient(90deg,#ca8a04,#eab308)}
+.mp-bar{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+#ult-row{display:flex;gap:2px;margin-top:5px}
+.ult-slot{flex:1;height:10px;border-radius:2px;background:#1a1a1a;border:1px solid #555;transition:background .3s}
+.ult-slot.on{background:linear-gradient(90deg,#fbbf24,#f59e0b);box-shadow:0 0 5px #fbbf24}
+/* 몬스터 UI */
+#mon-ui{position:absolute;top:6px;right:10px;width:300px;background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:8px 10px;font-size:12px}
+.mname{font-size:13px;font-weight:700;color:#FF7070;margin-bottom:5px}
+/* 버튼 영역 */
+#btns{flex-shrink:0;background:rgba(0,0,0,.88);border-top:1px solid rgba(255,200,50,.2);padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+.row{display:flex;gap:4px}
+.btn{flex:1;border:none;border-radius:7px;color:#fff;font-weight:700;cursor:pointer;font-size:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;transition:all .15s}
+.btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.2)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn .n{font-size:12px}.btn .c{font-size:10px;opacity:.8}
+.atk{background:linear-gradient(135deg,#7f1d1d,#dc2626)}
+.atk2{background:linear-gradient(135deg,#1e3a8a,#2563eb)}
+.def{background:linear-gradient(135deg,#374151,#6b7280)}
+.opp{background:linear-gradient(135deg,#14532d,#16a34a)}
+.ult{background:linear-gradient(135deg,#713f12,#d97706);box-shadow:0 0 10px #f59e0b}
+.parry-btn{background:linear-gradient(135deg,#7c2d12,#ea580c);animation:pp .6s infinite alternate}
+@keyframes pp{from{box-shadow:0 0 5px #ea580c}to{box-shadow:0 0 18px #ea580c,0 0 36px #f97316}}
+.swap{background:linear-gradient(135deg,#1e1b4b,#4338ca)}
+.pot{background:linear-gradient(135deg,#14532d,#15803d)}
+.give{background:linear-gradient(135deg,#1c1c1c,#374151)}
+/* 모달 */
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;align-items:center;justify-content:center}
+#modal.show{display:flex}
+#mbox{background:#1a1a2e;border:1px solid rgba(255,200,50,.4);border-radius:12px;padding:18px;min-width:280px;max-width:92vw;max-height:80vh;overflow-y:auto}
+#mbox h3{color:#FFD700;margin-bottom:10px;font-size:15px}
+.mbtn{display:block;width:100%;margin:5px 0;padding:9px 14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:7px;color:#fff;cursor:pointer;font-size:13px;text-align:left;transition:background .15s}
+.mbtn:hover{background:rgba(255,255,255,.2)}
+.mbtn:disabled{opacity:.4;cursor:not-allowed}
+.mcancel{background:rgba(255,50,50,.2);border-color:rgba(255,50,50,.4)}
 /* 결과 화면 */
-#result-screen {
-    display:none; position:fixed; inset:0;
-    background:rgba(0,0,0,0.85); z-index:200;
-    align-items:center; justify-content:center; flex-direction:column;
-    gap:16px;
+#result{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+#result.show{display:flex}
+#result h2{font-size:32px;font-weight:900}
+#result p{font-size:16px;color:#ccc;text-align:center;padding:0 20px}
+.rbtn{padding:12px 28px;border-radius:9px;border:none;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s}
+.rbtn:hover{transform:scale(1.04)}
+.r-cont{background:linear-gradient(135deg,#15803d,#22c55e);color:#fff}
+.r-end{background:linear-gradient(135deg,#1d4ed8,#60a5fa);color:#fff}
+/* 모바일 */
+@media(max-width:600px){
+  #pet-cv{width:120px;height:120px;bottom:120px;left:6px}
+  #mon-cv{width:120px;height:120px;top:50px;right:6px}
+  #pet-ui{width:calc(100vw - 16px);left:8px;bottom:4px}
+  #mon-ui{width:calc(100vw - 16px);right:8px;top:4px;font-size:11px}
+  #hud{padding:4px 8px;height:38px}
+  #hud .floor{font-size:14px}
+  #hud .res{font-size:10px;gap:7px}
+  .btn{font-size:10px;padding:6px 3px}
+  .btn .n{font-size:10px}
 }
-#result-screen.show { display:flex; }
-#result-screen h2 { font-size:36px; font-weight:900; }
-#result-screen p  { font-size:18px; color:#ccc; }
-.result-btn {
-    padding:14px 32px; border-radius:10px; border:none;
-    font-size:16px; font-weight:bold; cursor:pointer;
-    transition:all 0.15s;
-}
-.result-btn:hover { transform:scale(1.05); }
-.btn-continue { background:linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
-.btn-end      { background:linear-gradient(135deg,#1d4ed8,#60a5fa); color:#fff; }
 </style>
 </head>
 <body>
-<div id="game-container">
-    <!-- 상단 HUD -->
-    <div id="hud">
-        <div class="floor">⚔️ BLACK ARENA TOWER | <span id="floor-num">1</span>층</div>
-        <div class="elem-info" id="elem-info">속성 로딩중...</div>
-        <div class="resources">
-            <span>💰 <span id="bet-display">-</span></span>
-            <span>🍃 <span id="silver-display">0</span></span>
-            <span>🌟 <span id="gold-display">0</span></span>
-            <span>승리 <span id="wins-display">0</span>판</span>
-        </div>
-    </div>
 
-    <!-- 전투 화면 -->
-    <div id="battle-area">
-        <div id="battle-bg"></div>
-
-        <!-- 스프라이트 -->
-        <canvas id="pet-sprite" class="sprite" width="200" height="200"></canvas>
-        <canvas id="mon-sprite" class="sprite" width="200" height="200"></canvas>
-
-        <!-- 이펙트 -->
-        <div id="effect-layer"></div>
-
-        <!-- 로그 -->
-        <div id="battle-log"></div>
-
-        <!-- 몬스터 UI -->
-        <div id="mon-ui">
-            <div class="mon-name" id="mon-name">몬스터</div>
-            <div class="bar-wrap">
-                <div class="bar-bg">
-                    <div class="bar-fill hp-fill" id="mon-hp-bar" style="width:100%"></div>
-                    <div class="bar-text" id="mon-hp-text">HP -/-</div>
-                </div>
-            </div>
-            <div class="bar-wrap" style="margin-top:4px">
-                <div class="bar-bg" style="height:12px">
-                    <div class="bar-fill def-fill" id="mon-def-bar" style="width:30%"></div>
-                    <div class="bar-text" id="mon-def-text" style="font-size:10px">DEF -</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 펫 UI -->
-        <div id="pet-ui">
-            <div class="pet-name" id="pet-name">펫</div>
-            <div class="bar-wrap">
-                <div class="bar-bg">
-                    <div class="bar-fill hp-fill" id="pet-hp-bar" style="width:100%"></div>
-                    <div class="bar-text" id="pet-hp-text">HP -/-</div>
-                </div>
-            </div>
-            <div class="bar-wrap">
-                <div class="bar-bg" style="height:12px">
-                    <div class="bar-fill def-fill" id="pet-def-bar" style="width:30%"></div>
-                    <div class="bar-text" id="pet-def-text" style="font-size:10px">DEF -</div>
-                </div>
-            </div>
-            <div class="bar-wrap">
-                <div class="bar-bg" style="height:12px">
-                    <div class="bar-fill mp-fill" id="pet-mp-bar" style="width:100%"></div>
-                    <div class="bar-text" id="pet-mp-text" style="font-size:10px">MP -/-</div>
-                </div>
-            </div>
-            <div id="ult-gauge">
-                <div class="ult-slot" id="ult-0"></div>
-                <div class="ult-slot" id="ult-1"></div>
-                <div class="ult-slot" id="ult-2"></div>
-                <div class="ult-slot" id="ult-3"></div>
-                <div class="ult-slot" id="ult-4"></div>
-                <div class="ult-slot" id="ult-5"></div>
-                <div class="ult-slot" id="ult-6"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 스킬 버튼 영역 -->
-    <div id="skill-area">
-        <div id="skill-row1">
-            <button class="skill-btn btn-atk"  id="btn-skill1" onclick="doAction('skill1')">
-                <span class="btn-name">⚔️ 로딩중</span>
-                <span class="btn-cost">-MP</span>
-            </button>
-            <button class="skill-btn btn-atk2" id="btn-skill2" onclick="doAction('skill2')">
-                <span class="btn-name">💥 로딩중</span>
-                <span class="btn-cost">-MP</span>
-            </button>
-            <button class="skill-btn btn-def"  id="btn-defend"  onclick="doAction('defend')">
-                <span class="btn-name">🛡️ 방어</span>
-                <span class="btn-cost">피해-35%</span>
-            </button>
-            <button class="skill-btn btn-opp"  id="btn-opport"  onclick="doAction('opportunity')">
-                <span class="btn-name">⚡ 기회</span>
-                <span class="btn-cost">공격+30%</span>
-            </button>
-        </div>
-        <div id="skill-row2">
-            <button class="skill-btn btn-ult"   id="btn-ult"    onclick="doAction('ult')"   style="display:none">
-                <span class="btn-name">🌟 궁극기</span>
-                <span class="btn-cost">ULT</span>
-            </button>
-            <button class="skill-btn btn-parry" id="btn-parry"  onclick="doAction('parry')" style="display:none">
-                <span class="btn-name">⚡ 패링!</span>
-                <span class="btn-cost" id="parry-rate">-% 성공</span>
-            </button>
-            <button class="skill-btn btn-swap"  id="btn-swap"   onclick="openSwap()">
-                <span class="btn-name">🔄 교체</span>
-                <span class="btn-cost">파티</span>
-            </button>
-            <button class="skill-btn btn-pot"   id="btn-potion" onclick="openPotion()">
-                <span class="btn-name">🧪 포션</span>
-                <span class="btn-cost" id="potion-count">0개</span>
-            </button>
-            <button class="skill-btn btn-give"  id="btn-give"   onclick="doAction('give_up')">
-                <span class="btn-name">🏳️ 포기</span>
-                <span class="btn-cost"></span>
-            </button>
-        </div>
-    </div>
+<div id="hud">
+  <div class="floor">⚔️ BLACK ARENA TOWER | <span id="fl">1</span>층</div>
+  <div class="res">
+    <span>💰<span id="bet">-</span></span>
+    <span>🍃<span id="slv">0</span></span>
+    <span>🌟<span id="gld">0</span></span>
+    <span>승리<span id="wns">0</span>판</span>
+  </div>
 </div>
 
-<!-- 모달 -->
-<div id="modal-overlay">
-    <div id="modal-box">
-        <h3 id="modal-title">선택</h3>
-        <div id="modal-content"></div>
-        <button class="modal-btn modal-cancel" onclick="closeModal()">❌ 취소</button>
+<div id="arena">
+  <div id="bg"></div>
+  <canvas id="pet-cv" width="180" height="180"></canvas>
+  <canvas id="mon-cv" width="180" height="180"></canvas>
+  <div id="fx"></div>
+  <div id="log"></div>
+  <div id="mon-ui">
+    <div class="mname" id="mname">몬스터</div>
+    <div class="bar-bg"><div class="bar-fill hp-bar" id="mhp" style="width:100%"></div><div class="bar-txt" id="mhp-t">HP -/-</div></div>
+    <div class="bar-bg" style="height:10px"><div class="bar-fill" style="background:#6b7280" id="mdef" style="width:20%"></div><div class="bar-txt" id="mdef-t" style="font-size:9px">DEF -</div></div>
+  </div>
+  <div id="pet-ui">
+    <div class="pname" id="pname">펫</div>
+    <div class="bar-bg"><div class="bar-fill hp-bar" id="php" style="width:100%"></div><div class="bar-txt" id="php-t">HP -/-</div></div>
+    <div class="bar-bg" style="height:10px"><div class="bar-fill mp-bar" id="pmp" style="width:100%"></div><div class="bar-txt" id="pmp-t" style="font-size:9px">MP -/-</div></div>
+    <div id="ult-row">
+      <div class="ult-slot" id="u0"></div><div class="ult-slot" id="u1"></div><div class="ult-slot" id="u2"></div>
+      <div class="ult-slot" id="u3"></div><div class="ult-slot" id="u4"></div><div class="ult-slot" id="u5"></div><div class="ult-slot" id="u6"></div>
     </div>
+  </div>
 </div>
 
-<!-- 결과 화면 -->
-<div id="result-screen">
-    <h2 id="result-title">결과</h2>
-    <p id="result-desc"></p>
-    <div style="display:flex;gap:12px">
-        <button class="result-btn btn-continue" id="btn-continue" onclick="doAction('continue')" style="display:none">▶️ 계속하기</button>
-        <button class="result-btn btn-end"      id="btn-end-game" onclick="doAction('end')">🏆 종료</button>
-    </div>
+<div id="btns">
+  <div class="row">
+    <button class="btn atk"  id="b-s1"  onclick="act('skill1')"><span class="n" id="s1n">⚔️ 스킬1</span><span class="c" id="s1c">-MP</span></button>
+    <button class="btn atk2" id="b-s2"  onclick="act('skill2')"><span class="n" id="s2n">💥 스킬2</span><span class="c" id="s2c">-MP</span></button>
+    <button class="btn def"  id="b-def" onclick="act('defend')"><span class="n">🛡️ 방어</span><span class="c">-35%</span></button>
+    <button class="btn opp"  id="b-opp" onclick="act('opportunity')"><span class="n">⚡ 기회</span><span class="c">+30%</span></button>
+  </div>
+  <div class="row">
+    <button class="btn ult"      id="b-ult"   onclick="act('ult')"    style="display:none"><span class="n" id="ultn">🌟 ULT</span><span class="c">궁극기</span></button>
+    <button class="btn parry-btn"id="b-par"   onclick="act('parry')"  style="display:none"><span class="n">⚡ 패링!</span><span class="c" id="par-r">-%</span></button>
+    <button class="btn swap"     id="b-swp"   onclick="openSwap()"><span class="n">🔄 교체</span><span class="c">파티</span></button>
+    <button class="btn pot"      id="b-pot"   onclick="openPot()"><span class="n">🧪 포션</span><span class="c" id="potc">0개</span></button>
+    <button class="btn give"     id="b-give"  onclick="act('give_up')"><span class="n">🏳️ 포기</span><span class="c"></span></button>
+  </div>
+</div>
+
+<div id="modal"><div id="mbox"><h3 id="mt">선택</h3><div id="mc"></div><button class="mbtn mcancel" onclick="closeM()">❌ 닫기</button></div></div>
+
+<div id="result">
+  <h2 id="rt">결과</h2>
+  <p id="rd"></p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="rbtn r-cont" id="r-cont" onclick="act('continue')" style="display:none">▶️ 계속하기</button>
+    <button class="rbtn r-end"  id="r-end"  onclick="act('end')">🏆 종료</button>
+  </div>
 </div>
 
 <script>
+// ════════════════════════════════════════════════════════
+// 설정
+// ════════════════════════════════════════════════════════
 const API   = window.location.origin;
-const token = new URLSearchParams(window.location.search).get('token') || 'test';
-const CDN   = 'https://cdn.discordapp.com/attachments/1478283579485061129';
+const token = new URLSearchParams(location.search).get('token') || '';
 const BASE  = 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main';
-
-let gameState    = null;
-let actionLocked = false;
-
-// ── 이미지 URL ────────────────────────────────────────────────
-const PET_IMG = {
-    '토끼':    {idle:'1486930610541826139/1.png',  attack:'1486930610848006174/2.png'},
-    '강아지':  {idle:'1486930651881144452/3.png',  attack:'1486930652304773150/4.png'},
-    '고양이':  {idle:'1486930695871004742/5.png',  attack:'1486930696223068251/6.png'},
-    '드래곤':  {idle:'1486931725874499776/41.png', attack:'1486931726268895384/42.png'},
-    '호랑이':  {idle:'1486931424979321005/31.png', attack:'1486931425382109184/32.png'},
-    '피닉스':  {idle:'1486931627434053782/37.png', attack:'1486931627803283536/38.png'},
-};
-// 등급별 대표 색 (이미지 없을 때 배경색)
-const GRADE_COLOR = {
-    common:'#6b7280', uncommon:'#22c55e', rare:'#3b82f6',
-    legendary:'#f59e0b', mythic:'#a855f7', spirit:'#06b6d4',
-    immortal:'#f43f5e', celestial:'#eab308', admin:'#ff0000',
-};
-const ELEM_COLOR = {불:'#ef4444',물:'#3b82f6',번개:'#eab308',풀:'#22c55e',어둠:'#8b5cf6',얼음:'#93c5fd',물리:'#9ca3af'};
+let G = null;   // gameState
+let locked = false;
 
 // ════════════════════════════════════════════════════════
-// canvas 스프라이트 (검은 배경 없음)
+// canvas 스프라이트 — 검은 배경 없음
 // ════════════════════════════════════════════════════════
-const PET_PAL = {
-    토끼:{b:'#e0b4cc',a:'#ffaabb',e:'#ff2255'},강아지:{b:'#d4a870',a:'#b08040',e:'#331100'},
-    고양이:{b:'#909090',a:'#c09090',e:'#22cc44'},다람쥐:{b:'#b48030',a:'#d4a238',e:'#110000'},
-    돼지:{b:'#ffb4b0',a:'#ff8890',e:'#cc2244'},양:{b:'#f0f0f0',a:'#c8b8b0',e:'#334433'},
-    말:{b:'#a07846',a:'#785028',e:'#221100'},늑대:{b:'#646470',a:'#484860',e:'#ff4400'},
-    고릴라:{b:'#3c2d20',a:'#503820',e:'#ff5500'},코끼리:{b:'#8c8c96',a:'#787882',e:'#334466'},
-    판다:{b:'#f0f0f0',a:'#141414',e:'#111111'},곰:{b:'#50371e',a:'#644628',e:'#220000'},
-    독수리:{b:'#504630',a:'#ffb400',e:'#ff6600'},샤크:{b:'#507898',a:'#3c6488',e:'#001133'},
-    악어:{b:'#32783c',a:'#286430',e:'#ff5500'},사자:{b:'#c89632',a:'#ffc850',e:'#ff8800'},
-    호랑이:{b:'#d46e1e',a:'#111111',e:'#ff4400'},유니콘:{b:'#f0c8ff',a:'#ffb4dc',e:'#aa44ff'},
-    티렉스:{b:'#3c7830',a:'#50a040',e:'#ff2200'},피닉스:{b:'#dc5014',a:'#ffa000',e:'#ffff00'},
-    오니:{b:'#b41e1e',a:'#ff5000',e:'#ffff00'},드래곤:{b:'#b43218',a:'#dc5014',e:'#ff0000'},
-    바이퍼:{b:'#14b464',a:'#0af078',e:'#00ff88'},제우스:{b:'#f0dc50',a:'#ffff78',e:'#0044ff'},
-    하데스:{b:'#281450',a:'#643296',e:'#aa00ff'},
-    _def:{b:'#9664b4',a:'#8250a0',e:'#ff88ff'},
+const PP = {  // 펫 팔레트
+  토끼:{b:'#e0b4cc',a:'#ffaabb',e:'#ff2255'},강아지:{b:'#d4a870',a:'#b08040',e:'#442200'},
+  고양이:{b:'#909090',a:'#c09090',e:'#22cc44'},다람쥐:{b:'#b48030',a:'#d4a238',e:'#110000'},
+  돼지:{b:'#ffb4b0',a:'#ff8890',e:'#cc2244'},양:{b:'#f0f0f0',a:'#c8b8b0',e:'#334433'},
+  말:{b:'#a07846',a:'#785028',e:'#221100'},늑대:{b:'#646470',a:'#484860',e:'#ff4400'},
+  고릴라:{b:'#3c2d20',a:'#503820',e:'#ff5500'},코끼리:{b:'#8c8c96',a:'#787882',e:'#334466'},
+  판다:{b:'#f0f0f0',a:'#141414',e:'#111111'},곰:{b:'#50371e',a:'#644628',e:'#220000'},
+  독수리:{b:'#504630',a:'#ffb400',e:'#ff6600'},샤크:{b:'#507898',a:'#3c6488',e:'#001133'},
+  악어:{b:'#32783c',a:'#286430',e:'#ff5500'},사자:{b:'#c89632',a:'#ffc850',e:'#ff8800'},
+  호랑이:{b:'#d46e1e',a:'#111',e:'#ff4400'},유니콘:{b:'#f0c8ff',a:'#ffb4dc',e:'#aa44ff'},
+  티렉스:{b:'#3c7830',a:'#50a040',e:'#ff2200'},피닉스:{b:'#dc5014',a:'#ffa000',e:'#ffff00'},
+  오니:{b:'#b41e1e',a:'#ff5000',e:'#ffff00'},드래곤:{b:'#b43218',a:'#dc5014',e:'#ff0000'},
+  바이퍼:{b:'#14b464',a:'#0af078',e:'#00ff88'},제우스:{b:'#f0dc50',a:'#ffff78',e:'#0044ff'},
+  하데스:{b:'#281450',a:'#643296',e:'#aa00ff'},_def:{b:'#9664b4',a:'#8250a0',e:'#ff88ff'},
 };
-const MON_KEY_COL = {
-    슬라임:'#3cc850',고블린:'#50a03c',박쥐:'#503264',거북:'#3c8250',전갈:'#8c6420',
-    까마귀:'#32283c',사슴:'#78582e',벌레:'#b45014',여우:'#b47820',개구리:'#3ca03c',
-    벌:'#b49614',유령:'#b4a0dc',해골:'#c8bea8',멧돼지:'#785040',도적:'#5a4632',
-    기사:'#828296',물고기:'#3c78b4',드워프:'#78582e',도마뱀:'#3c9650',골렘:'#968c82',
-    버섯:'#b43c8c',늑대:'#645058',거미:'#503c50',양:'#c8beb4',도깨비:'#c8501e',
-    심연:'#281450',광폭:'#641e96',황금:'#c8aa14',블러드:'#b4141e',아이스:'#78b4dc',
-    쉐도우:'#321e46',파괴자:'#5064c8',검은:'#14101e',_def:'#a03232',
+const MC = {  // 몬스터 색
+  슬라임:'#3cc850',고블린:'#50a03c',박쥐:'#503264',거북:'#3c8250',전갈:'#8c6420',
+  까마귀:'#32283c',사슴:'#78582e',벌레:'#b45014',여우:'#b47820',개구리:'#3ca03c',
+  벌:'#b49614',유령:'#b4a0dc',해골:'#c8bea8',멧돼지:'#785040',도적:'#5a4632',
+  기사:'#828296',물고기:'#3c78b4',도마뱀:'#3c9650',골렘:'#968c82',버섯:'#b43c8c',
+  늑대:'#645058',거미:'#503c50',도깨비:'#c8501e',심연:'#281450',광폭:'#641e96',
+  황금:'#c8aa14',블러드:'#b4141e',아이스:'#78b4dc',쉐도우:'#321e46',검은:'#14101e',
+  _def:'#a03232',
 };
-function _getMonCol(name){for(const[k,c]of Object.entries(MON_KEY_COL))if(name.includes(k))return c;return MON_KEY_COL._def;}
-function _shade(hex,f=0.6){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgb(${~~(r*f)},${~~(g*f)},${~~(b*f)})`;}
+function mCol(n){for(const[k,c]of Object.entries(MC))if(n.includes(k))return c;return MC._def;}
+function shade(h,f){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgb(${~~(r*f)},${~~(g*f)},${~~(b*f)})`;}
 
-function drawPetSprite(id, name, hpRatio=1.0, attack=false) {
-    const cv=document.getElementById(id); if(!cv||!cv.getContext)return;
-    const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
-    ctx.clearRect(0,0,W,H);
-    const p=PET_PAL[name]||PET_PAL._def;
-    const body=hpRatio<0.3?_shade(p.b,0.7):p.b, acc=hpRatio<0.3?_shade(p.a,0.7):p.a, eye=hpRatio<=0?'#ff2222':p.e;
-    const cx=attack?W*0.58:W*0.50, cy=H*0.54, s=Math.min(W,H)*0.34;
-    // 그림자
-    ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';
-    ctx.beginPath();ctx.ellipse(cx,cy+s*0.55,s*0.65,s*0.15,0,0,Math.PI*2);ctx.fill();ctx.restore();
-    // 몸통
-    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx,cy,s*0.70,s*0.58,0,0,Math.PI*2);ctx.fill();
-    // 머리
-    const hx=cx+s*0.28,hy=cy-s*0.32,hr=s*0.36;
-    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*0.9,0,0,Math.PI*2);ctx.fill();
-    // 귀
-    ctx.fillStyle=acc;
-    ctx.beginPath();ctx.ellipse(hx-hr*0.5,hy-hr*0.85,hr*0.22,hr*0.38,-0.3,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(hx+hr*0.5,hy-hr*0.85,hr*0.22,hr*0.38,0.3,0,Math.PI*2);ctx.fill();
-    // 눈
-    ctx.fillStyle=eye;ctx.beginPath();ctx.ellipse(hx-hr*0.28,hy-hr*0.08,hr*0.13,hr*0.16,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx-hr*0.24,hy-hr*0.13,hr*0.05,hr*0.06,0,0,Math.PI*2);ctx.fill();
-    // 공격 포즈 (앞발)
-    if(attack){ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx+s*0.65,cy-s*0.05,s*0.22,s*0.14,0.5,0,Math.PI*2);ctx.fill();}
+function drawPet(cv, name, hpR=1, atk=false){
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const p=PP[name]||PP._def;
+  const body=hpR<.3?shade(p.b,.7):p.b, acc=hpR<.3?shade(p.a,.7):p.a, eye=hpR<=0?'#f00':p.e;
+  const cx=atk?W*.60:W*.50, cy=H*.54, s=Math.min(W,H)*.34;
+  // 그림자
+  ctx.save();ctx.globalAlpha=.22;ctx.fillStyle='#000';
+  ctx.beginPath();ctx.ellipse(cx,cy+s*.55,s*.65,s*.14,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  // 몸통
+  ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx,cy,s*.70,s*.58,0,0,Math.PI*2);ctx.fill();
+  // 머리
+  const hx=cx+s*.28,hy=cy-s*.32,hr=s*.36;
+  ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*.90,0,0,Math.PI*2);ctx.fill();
+  // 귀
+  ctx.fillStyle=acc;
+  ctx.beginPath();ctx.ellipse(hx-hr*.50,hy-hr*.85,hr*.22,hr*.38,-.30,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(hx+hr*.50,hy-hr*.85,hr*.22,hr*.38, .30,0,Math.PI*2);ctx.fill();
+  // 눈
+  ctx.fillStyle=eye;ctx.beginPath();ctx.ellipse(hx-hr*.28,hy-hr*.08,hr*.13,hr*.16,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx-hr*.24,hy-hr*.13,hr*.05,hr*.06,0,0,Math.PI*2);ctx.fill();
+  // 공격 포즈
+  if(atk){ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx+s*.66,cy-s*.05,s*.22,s*.14,.50,0,Math.PI*2);ctx.fill();}
 }
 
-function drawMonSprite(id, name, elem, hpRatio=1.0, isBoss=false, isElite=false) {
-    const cv=document.getElementById(id); if(!cv||!cv.getContext)return;
-    const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
-    ctx.clearRect(0,0,W,H);
-    const baseHex=_getMonCol(name), body=hpRatio<0.3?_shade(baseHex,0.7):baseHex;
-    const eyeC=isBoss?'#ff0000':isElite?'#cc00ff':'#ff3300';
-    const cx=W*0.50, cy=H*0.50, s=Math.min(W,H)*(isBoss?0.40:isElite?0.37:0.33);
-    // 오라
-    if(isBoss||isElite){
-        const g2=ctx.createRadialGradient(cx,cy,s*0.3,cx,cy,s*1.1);
-        g2.addColorStop(0,isBoss?'rgba(255,68,0,0.25)':'rgba(170,0,255,0.2)');g2.addColorStop(1,'transparent');
-        ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(cx,cy,s*1.1,s*1.1,0,0,Math.PI*2);ctx.fill();
+function drawMon(cv, name, elem, hpR=1, boss=false, elite=false){
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const base=mCol(name), body=hpR<.3?shade(base,.7):base;
+  const eyeC=boss?'#f00':elite?'#c0f':'#f33';
+  const cx=W*.50, cy=H*.50, s=Math.min(W,H)*(boss?.40:elite?.37:.33);
+  // 오라
+  if(boss||elite){
+    const g2=ctx.createRadialGradient(cx,cy,s*.3,cx,cy,s*1.1);
+    g2.addColorStop(0,boss?'rgba(255,68,0,.25)':'rgba(170,0,255,.2)');g2.addColorStop(1,'transparent');
+    ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(cx,cy,s*1.1,s*1.1,0,0,Math.PI*2);ctx.fill();
+  }
+  // 그림자
+  ctx.save();ctx.globalAlpha=.22;ctx.fillStyle='#000';
+  ctx.beginPath();ctx.ellipse(cx,cy+s*.60,s*.68,s*.14,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  // 몸통 — 오른쪽 바라봄 (flip)
+  ctx.save();ctx.translate(W,0);ctx.scale(-1,1);
+  const cx2=W-cx;
+  ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx2,cy,s*.75,s*.65,0,0,Math.PI*2);ctx.fill();
+  // 머리
+  const hx=cx2+s*.28,hy=cy-s*.28,hr=s*.38;
+  ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*.88,0,0,Math.PI*2);ctx.fill();
+  // 뿔
+  if(boss){
+    ctx.fillStyle='#f80';
+    ctx.beginPath();ctx.moveTo(hx-hr*.2,hy-hr*.8);ctx.lineTo(hx-hr*.5,hy-hr*1.6);ctx.lineTo(hx+hr*.1,hy-hr*.8);ctx.fill();
+    ctx.beginPath();ctx.moveTo(hx+hr*.3,hy-hr*.7);ctx.lineTo(hx,hy-hr*1.4);ctx.lineTo(hx+hr*.6,hy-hr*.7);ctx.fill();
+  }else if(elite){
+    ctx.fillStyle='#c4f';
+    ctx.beginPath();ctx.moveTo(hx,hy-hr*.9);ctx.lineTo(hx-hr*.3,hy-hr*1.5);ctx.lineTo(hx+hr*.3,hy-hr*1.5);ctx.fill();
+  }
+  // 눈
+  ctx.fillStyle=eyeC;ctx.beginPath();ctx.ellipse(hx+hr*.22,hy-hr*.08,hr*.15,hr*.18,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx+hr*.27,hy-hr*.12,hr*.05,hr*.06,0,0,Math.PI*2);ctx.fill();
+  // 이빨
+  ctx.fillStyle=boss?'#f44':elite?'#c4f':shade(base,.55);
+  ctx.beginPath();ctx.moveTo(hx+hr*.15,hy+hr*.30);ctx.lineTo(hx+hr*.25,hy+hr*.55);ctx.lineTo(hx+hr*.35,hy+hr*.30);ctx.fill();
+  ctx.restore();
+  // 상처 (낮은 HP)
+  if(hpR<.3&&hpR>0){
+    ctx.save();ctx.strokeStyle='#f22';ctx.lineWidth=2;ctx.globalAlpha=.7;
+    ctx.beginPath();ctx.moveTo(cx-s*.2,cy-s*.3);ctx.lineTo(cx+s*.1,cy+s*.1);ctx.stroke();ctx.restore();
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// 렌더링
+// ════════════════════════════════════════════════════════
+function bar(id, cur, max, label, cls=''){
+  const f=document.getElementById(id); const t=document.getElementById(id+'-t');
+  if(!f||!t)return;
+  const pct=max>0?Math.max(0,Math.min(100,cur/max*100)):0;
+  f.style.width=pct+'%'; t.textContent=label;
+  f.className='bar-fill '+(id.includes('hp')?('hp-bar'+(pct<30?' low':pct<60?' mid':'')):'mp-bar')+' '+cls;
+}
+
+function render(){
+  if(!G)return;
+  const g=G, pet=g.party[g.active], mon=g.monster;
+  if(['result','defeat','ended'].includes(g.phase)){showResult();return;}
+  if(g.phase==='shop'){showShop();return;}
+  if(g.phase==='event'){showEvent();return;}
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('fl').textContent=g.floor;
+  document.getElementById('bet').textContent=fmt(g.bet);
+  document.getElementById('slv').textContent=g.silver||0;
+  document.getElementById('gld').textContent=g.gold||0;
+  document.getElementById('wns').textContent=g.wins||0;
+  // 배경
+  const bk=mon.is_boss?'boss':mon.is_elite?'elite':'normal';
+  const bm={normal:'/normal_field.png',boss:'/Boss_field.png',elite:'/normal_field.png'};
+  document.getElementById('bg').style.backgroundImage=`url('${BASE}${bm[bk]}')`;
+  // 스프라이트
+  drawPet(document.getElementById('pet-cv'), pet.name, pet.hp/pet.max_hp, false);
+  drawMon(document.getElementById('mon-cv'), mon.name, mon.element, mon.hp/mon.max_hp, mon.is_boss, mon.is_elite);
+  // 펫 UI
+  document.getElementById('pname').textContent=`${pet.emoji||'🐾'} ${pet.name} Lv.${pet.level} ${pet.element}`;
+  bar('php', pet.hp, pet.max_hp, `HP ${pet.hp}/${pet.max_hp}`);
+  bar('pmp', pet.cur_mana, pet.max_mana, `MP ${pet.cur_mana}/${pet.max_mana}`);
+  for(let i=0;i<7;i++) document.getElementById('u'+i).className='ult-slot'+(i<pet.ult_gauge?' on':'');
+  // 몬스터 UI
+  const mt=mon.is_boss?'👑 BOSS ':mon.is_elite?'⚠️ ELITE ':'';
+  document.getElementById('mname').textContent=`${mt}${mon.emoji||'👹'} ${mon.name} Lv.${mon.level||0}`;
+  bar('mhp', mon.hp, mon.max_hp, `HP ${mon.hp}/${mon.max_hp}`);
+  document.getElementById('mdef').style.width=Math.min(100,((mon.def||0)/200)*100)+'%';
+  document.getElementById('mdef-t').textContent=`DEF ${mon.def||0}`;
+  // 버튼
+  renderBtns();
+}
+
+function renderBtns(){
+  if(!G||locked)return;
+  const pet=G.party[G.active];
+  const s1=pet.skills?.skill1||{name:'스킬1',mana:10};
+  const s2=pet.skills?.skill2||{name:'스킬2',mana:25};
+  const ult=pet.skills?.ult;
+  document.getElementById('s1n').textContent=`⚔️ ${s1.name}`;
+  document.getElementById('s1c').textContent=`${s1.mana}MP`;
+  document.getElementById('b-s1').disabled=locked||pet.cur_mana<s1.mana||(pet.skill_cd?.[s1.name]||0)>0;
+  document.getElementById('s2n').textContent=`💥 ${s2.name}`;
+  document.getElementById('s2c').textContent=`${s2.mana}MP`;
+  document.getElementById('b-s2').disabled=locked||pet.cur_mana<s2.mana||(pet.skill_cd?.[s2.name]||0)>0;
+  document.getElementById('b-def').disabled=locked;
+  document.getElementById('b-opp').disabled=locked;
+  const ub=document.getElementById('b-ult');
+  ub.style.display=(ult&&pet.ult_gauge>=7)?'flex':'none';
+  if(ult) document.getElementById('ultn').textContent=`🌟 ${ult.name}`;
+  const pb=document.getElementById('b-par');
+  pb.style.display=G.parry_available?'flex':'none';
+  if(G.parry_available){
+    const sp=pet.speed||60,sm=G.monster.spd||50;
+    document.getElementById('par-r').textContent=`${Math.min(65,~~(sp/(sp+sm)*100))}%`;
+  }
+  const ptot=Object.values(G.potions||{}).reduce((a,b)=>a+b,0);
+  document.getElementById('potc').textContent=ptot+'개';
+  document.getElementById('b-pot').disabled=ptot===0||locked;
+  document.getElementById('b-swp').disabled=locked||!G.party.some((p,i)=>p.alive&&i!==G.active);
+}
+
+// ════════════════════════════════════════════════════════
+// 액션 실행
+// ════════════════════════════════════════════════════════
+async function act(action, extra={}){
+  if(locked)return;
+  locked=true; disableAll(true);
+  try{
+    // 내 행동 애니
+    await animAction(action);
+    // API 호출
+    const r=await fetch(`${API}/api/game/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action,extra})});
+    if(!r.ok){
+      let msg='오류';try{const e=await r.json();msg=e.detail||msg;}catch(_){}
+      showLog('⚠️ '+msg); locked=false; disableAll(false); renderBtns(); return;
     }
-    // 그림자
-    ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';
-    ctx.beginPath();ctx.ellipse(cx,cy+s*0.60,s*0.68,s*0.15,0,0,Math.PI*2);ctx.fill();ctx.restore();
-    // 몸통
-    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(cx,cy,s*0.75,s*0.65,0,0,Math.PI*2);ctx.fill();
-    // 머리 (왼쪽)
-    const hx=cx-s*0.28,hy=cy-s*0.28,hr=s*0.38;
-    ctx.fillStyle=body;ctx.beginPath();ctx.ellipse(hx,hy,hr,hr*0.88,0,0,Math.PI*2);ctx.fill();
-    // 보스/엘리트 뿔
-    if(isBoss){
-        ctx.fillStyle='#ff8800';
-        ctx.beginPath();ctx.moveTo(hx-hr*0.2,hy-hr*0.8);ctx.lineTo(hx-hr*0.5,hy-hr*1.6);ctx.lineTo(hx+hr*0.1,hy-hr*0.8);ctx.fill();
-        ctx.beginPath();ctx.moveTo(hx+hr*0.3,hy-hr*0.7);ctx.lineTo(hx,hy-hr*1.4);ctx.lineTo(hx+hr*0.6,hy-hr*0.7);ctx.fill();
-    }else if(isElite){
-        ctx.fillStyle='#cc44ff';
-        ctx.beginPath();ctx.moveTo(hx,hy-hr*0.9);ctx.lineTo(hx-hr*0.3,hy-hr*1.5);ctx.lineTo(hx+hr*0.3,hy-hr*1.5);ctx.fill();
-    }
-    // 눈
-    ctx.fillStyle=eyeC;ctx.beginPath();ctx.ellipse(hx+hr*0.22,hy-hr*0.08,hr*0.15,hr*0.18,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(hx+hr*0.26,hy-hr*0.12,hr*0.05,hr*0.06,0,0,Math.PI*2);ctx.fill();
-    // 이빨
-    const det=isBoss?'#ff4400':isElite?'#cc44ff':_shade(baseHex,0.55);
-    ctx.fillStyle=det;ctx.beginPath();ctx.moveTo(hx+hr*0.15,hy+hr*0.30);ctx.lineTo(hx+hr*0.25,hy+hr*0.55);ctx.lineTo(hx+hr*0.35,hy+hr*0.30);ctx.fill();
-    // 상처 (HP 낮음)
-    if(hpRatio<0.3&&hpRatio>0){
-        ctx.save();ctx.strokeStyle='#ff2222';ctx.lineWidth=2;ctx.globalAlpha=0.7;
-        ctx.beginPath();ctx.moveTo(cx-s*0.2,cy-s*0.3);ctx.lineTo(cx+s*0.1,cy+s*0.1);ctx.stroke();ctx.restore();
-    }
+    const d=await r.json();
+    await handleResult(d);
+  }catch(e){
+    console.error(e); showLog('⚠️ 서버 연결 실패'); locked=false; disableAll(false); renderBtns();
+  }
 }
 
-// getPetUrl 호환용 (혹시 남은 참조)
-function getPetUrl(name, state='idle') { return null; }
-
-// ── 초기화 ────────────────────────────────────────────────────
-async function initGame() {
-    try {
-        const r = await fetch(`${API}/api/game/state?token=${token}`);
-        if (!r.ok) {
-            showError('게임 세션이 없습니다.<br>Discord에서 <b>/블레나 시작</b> 을 먼저 하세요.');
-            return;
-        }
-        gameState = await r.json();
-    } catch(e) {
-        showError('서버에 연결할 수 없습니다.<br>Discord에서 <b>/블레나 시작</b> 후 다시 시도하세요.<br><small>' + e.message + '</small>');
-    }
-    renderAll();
+async function callAPI(action, extra={}){
+  const r=await fetch(`${API}/api/game/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,action,extra})});
+  if(!r.ok){let e={detail:'오류'};try{e=await r.json();}catch(_){}throw new Error(e.detail);}
+  return await r.json();
 }
 
-// ── 전체 렌더 ─────────────────────────────────────────────────
-function renderAll() {
-    if (!gameState) return;
-    const g   = gameState;
-    const pet = g.party[g.active];
-    const mon = g.monster;
-
-    // phase별 분기
-    if (g.phase === 'defeat') { showResultScreen('defeat'); return; }
-    if (g.phase === 'result') { showResultScreen('result'); return; }
-    if (g.phase === 'ended')  { showResultScreen('ended');  return; }
-    if (g.phase === 'shop')   { showShopScreen();  return; }
-    if (g.phase === 'event')  { showEventScreen(); return; }
-
-    document.getElementById('result-screen').classList.remove('show');
-
-    // HUD
-    document.getElementById('floor-num').textContent   = g.floor;
-    document.getElementById('bet-display').textContent = fmtCoin(g.bet||0);
-    document.getElementById('silver-display').textContent = g.silver||0;
-    document.getElementById('gold-display').textContent   = g.gold||0;
-    document.getElementById('wins-display').textContent   = g.wins||0;
-    document.getElementById('elem-info').textContent =
-        `${pet.element} vs ${mon.element} ${getElemAdv(pet.element, mon.element)}`;
-
-    // 배경
-    const bgKey = mon.is_boss ? 'boss' : (mon.is_elite ? 'elite' : 'normal');
-    const bgMap = {normal:'/normal_field.png', boss:'/Boss_field.png', elite:'/normal_field.png'};
-    document.getElementById('battle-bg').style.backgroundImage = `url('${BASE}${bgMap[bgKey]}')`;
-
-    // ★ canvas 스프라이트 (검은 배경 없음)
-    drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
-    drawMonSprite('mon-sprite', mon.name, mon.element, mon.hp/mon.max_hp, mon.is_boss, mon.is_elite);
-
-    // 펫 UI
-    document.getElementById('pet-name').textContent =
-        `${pet.emoji||'🐾'} ${pet.name}  Lv.${pet.level}  ${pet.element}`;
-    updateBar('pet-hp',  pet.hp,       pet.max_hp,   `HP ${pet.hp}/${pet.max_hp}`);
-    updateBar('pet-def', pet.def,      300,          `DEF ${pet.def}`, true);
-    updateBar('pet-mp',  pet.cur_mana, pet.max_mana, `MP ${pet.cur_mana}/${pet.max_mana}`);
-    for (let i=0; i<7; i++)
-        document.getElementById(`ult-${i}`).className = 'ult-slot' + (i < pet.ult_gauge ? ' filled' : '');
-
-    // 몬스터 UI
-    const mt = mon.is_boss ? '👑 BOSS ' : (mon.is_elite ? '⚠️ ELITE ' : '');
-    document.getElementById('mon-name').textContent =
-        `${mt}${mon.emoji||'👹'} ${mon.name}  Lv.${mon.level||0}  ${mon.element}`;
-    updateBar('mon-hp',  mon.hp,  mon.max_hp, `HP ${mon.hp}/${mon.max_hp}`);
-    updateBar('mon-def', mon.def||0, 300,     `DEF ${mon.def||0}`, true);
-
-    renderButtons();
+// ════════════════════════════════════════════════════════
+// 결과 처리
+// ════════════════════════════════════════════════════════
+async function handleResult(d){
+  if(!d)return;
+  if(d.game_state) G=d.game_state;
+  // 로그
+  if(d.logs?.length) for(const l of d.logs){if(l?.trim())showLog(l.replace(/\*\*/g,''));await sleep(320);}
+  // 내 공격 데미지
+  if(d.pet_dmg>0) showDmg(d.pet_dmg, d.pet_crit, false);
+  // 몬스터 반격 애니 (딜레이 후)
+  if(d.mon_dmg>0) await animMon(d.mon_dmg, d.mon_anim_delay??800);
+  // phase별 처리
+  if(d.phase==='ended'){
+    document.getElementById('rt').textContent=d.reward>0?'🏆 종료!':'🏳️ 포기';
+    document.getElementById('rd').textContent=`${d.floor||0}층  ${d.msg||''}`;
+    document.getElementById('r-cont').style.display='none';
+    document.getElementById('r-end').textContent='✅ 확인';
+    document.getElementById('result').classList.add('show');
+    locked=false; return;
+  }
+  if(d.phase==='defeat'){
+    document.getElementById('rt').textContent='💀 전멸...';
+    document.getElementById('rd').textContent=`${G?.floor||'?'}층에서 쓰러짐. 배팅금 몰수.`;
+    document.getElementById('r-cont').style.display='none';
+    document.getElementById('r-end').textContent='✅ 확인';
+    document.getElementById('result').classList.add('show');
+    locked=false; return;
+  }
+  if(d.phase==='result'){
+    document.getElementById('rt').textContent='✅ 처치!';
+    document.getElementById('rd').textContent=`${(G?.floor||1)-1}층  승리 ${G?.wins||0}판  예상 보상 ${fmt(d.reward||0)}`;
+    document.getElementById('r-cont').style.display='flex';
+    document.getElementById('r-end').textContent=`🏆 종료 (+${fmt(d.reward||0)})`;
+    document.getElementById('result').classList.add('show');
+    locked=false; return;
+  }
+  if(d.phase==='shop'){
+    document.getElementById('result').classList.remove('show');
+    showShop(); locked=false; return;
+  }
+  if(d.phase==='event'){
+    document.getElementById('result').classList.remove('show');
+    showEvent(); locked=false; return;
+  }
+  // 일반 전투
+  document.getElementById('result').classList.remove('show');
+  render(); locked=false; renderBtns();
 }
 
-function updateBar(id, cur, max, label, noClass=false) {
-    const fill = document.getElementById(`${id}-bar`);
-    const text = document.getElementById(`${id}-text`);
-    if (!fill || !text) return;
-    const pct = max > 0 ? Math.max(0, Math.min(100, cur/max*100)) : 0;
-    fill.style.width = pct + '%';
-    text.textContent = label;
-    if (!noClass && id.includes('hp')) {
-        fill.className = 'bar-fill hp-fill' + (pct<30?' low':(pct<60?' mid':''));
-    }
+// ════════════════════════════════════════════════════════
+// 애니메이션
+// ════════════════════════════════════════════════════════
+const ELEM_FX={불:'🔥',물:'💧',번개:'⚡',풀:'🌿',어둠:'🌑',얼음:'❄️',물리:'⚔️'};
+const ELEM_COL={불:'#ef4444',물:'#3b82f6',번개:'#eab308',풀:'#22c55e',어둠:'#8b5cf6',얼음:'#93c5fd',물리:'#9ca3af'};
+
+async function animAction(action){
+  const pet=G?.party?.[G?.active]; if(!pet)return;
+  if(['skill1','skill2','ult','secret'].includes(action)){
+    const cv=document.getElementById('pet-cv');
+    cv.classList.add('attack');
+    drawPet(cv,pet.name,pet.hp/pet.max_hp,true);
+    showFx(ELEM_FX[pet.element]||'✨', ELEM_COL[pet.element]||'#fff', false);
+    await sleep(340);
+    const mc=document.getElementById('mon-cv');
+    mc.classList.add('hit');
+    document.getElementById('bg').classList.add('flash');
+    await sleep(280);
+    mc.classList.remove('hit');
+    document.getElementById('bg').classList.remove('flash');
+    cv.classList.remove('attack');
+    drawPet(cv,pet.name,pet.hp/pet.max_hp,false);
+  }else if(action==='parry'){showFxTxt('⚡ 패링!','#f97316');await sleep(180);}
+  else if(action==='defend'){showFxTxt('🛡️ 방어!','#60a5fa');await sleep(180);}
+  else if(action==='opportunity'){showFxTxt('⚡ 기회!','#a3e635');await sleep(180);}
 }
 
-function renderButtons() {
-    if (!gameState || actionLocked) return;
-    const g   = gameState;
-    const pet = g.party[g.active];
-    const s1  = pet.skills?.skill1 || {name:'스킬1',mana:10};
-    const s2  = pet.skills?.skill2 || {name:'스킬2',mana:25};
-    const ult = pet.skills?.ult;
-
-    const b1 = document.getElementById('btn-skill1');
-    b1.querySelector('.btn-name').textContent = `⚔️ ${s1.name}`;
-    b1.querySelector('.btn-cost').textContent = `${s1.mana}MP`;
-    b1.disabled = actionLocked || pet.cur_mana < s1.mana || (pet.skill_cd?.[s1.name]||0) > 0;
-
-    const b2 = document.getElementById('btn-skill2');
-    b2.querySelector('.btn-name').textContent = `💥 ${s2.name}`;
-    b2.querySelector('.btn-cost').textContent = `${s2.mana}MP`;
-    b2.disabled = actionLocked || pet.cur_mana < s2.mana || (pet.skill_cd?.[s2.name]||0) > 0;
-
-    document.getElementById('btn-defend').disabled = actionLocked;
-    document.getElementById('btn-opport').disabled = actionLocked;
-
-    const ultBtn = document.getElementById('btn-ult');
-    ultBtn.style.display = (ult && pet.ult_gauge >= 7) ? 'flex' : 'none';
-    if (ult) ultBtn.querySelector('.btn-name').textContent = `🌟 ${ult.name}`;
-
-    const parryBtn = document.getElementById('btn-parry');
-    parryBtn.style.display = g.parry_available ? 'flex' : 'none';
-    if (g.parry_available) {
-        const rate = calcParryRate(pet, g.monster);
-        document.getElementById('parry-rate').textContent = `${rate}% 성공`;
-    }
-
-    const potTotal = Object.values(g.potions||{}).reduce((a,b)=>a+b, 0);
-    document.getElementById('potion-count').textContent = `${potTotal}개`;
-    document.getElementById('btn-potion').disabled = potTotal === 0 || actionLocked;
-
-    const aliveOthers = g.party.filter((p,i) => p.alive && i !== g.active);
-    document.getElementById('btn-swap').disabled = aliveOthers.length === 0 || actionLocked;
+async function animMon(dmg, delayMs=800){
+  if(delayMs>0) await sleep(delayMs);
+  const mc=document.getElementById('mon-cv');
+  mc.classList.add('mon-attack');
+  showFxTxt('👹 공격!','#ff6060');
+  await sleep(340);
+  mc.classList.remove('mon-attack');
+  const pc=document.getElementById('pet-cv');
+  pc.style.filter='brightness(2) saturate(0)';
+  showDmg(dmg,false,true);
+  await sleep(280);
+  pc.style.filter='';
+  const ap=G?.party?.[G?.active];
+  if(ap) drawPet(pc,ap.name,ap.hp/ap.max_hp,false);
 }
 
-// ── 행동 실행 ─────────────────────────────────────────────────
-async function doAction(action, extra={}) {
-    if (actionLocked) return;
-    actionLocked = true;
-    setAllDisabled(true);
-
-    try {
-        await playActionAnim(action);
-
-        const r = await fetch(`${API}/api/game/action`, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({token, action, extra})
-        });
-
-        if (!r.ok) {
-            let msg = '서버 오류';
-            try { const e = await r.json(); msg = e.detail || msg; } catch(_) {}
-            showLog('⚠️ ' + msg);
-            actionLocked = false;
-            setAllDisabled(false);
-            renderButtons();
-            return;
-        }
-
-        const data = await r.json();
-        if (data) await processResult(data);
-
-    } catch(e) {
-        console.error('[doAction]', e);
-        showLog('⚠️ 서버 연결 실패: ' + e.message);
-        actionLocked = false;
-        setAllDisabled(false);
-        renderButtons();
-        return;
-    }
-
-    actionLocked = false;
-    renderButtons();
+function showFx(icon, color, onMon=true){
+  const el=document.createElement('div'); el.className='fx-txt';
+  el.textContent=icon; el.style.color=color;
+  if(onMon){el.style.right='80px';el.style.top='40%';}
+  else{el.style.left='120px';el.style.top='40%';}
+  document.getElementById('fx').appendChild(el);
+  setTimeout(()=>el.remove(),900);
+}
+function showFxTxt(txt,color){
+  const el=document.createElement('div');el.className='fx-txt';
+  el.textContent=txt;el.style.cssText=`color:${color};left:50%;top:38%;transform:translateX(-50%);font-size:26px`;
+  document.getElementById('fx').appendChild(el);setTimeout(()=>el.remove(),900);
+}
+function showDmg(dmg,crit,onPet){
+  const el=document.createElement('div');el.className='dmg';
+  el.textContent=(crit?'💥':'-')+dmg.toLocaleString();
+  el.style.color=crit?'#FFD700':onPet?'#ff4444':'#ff8888';
+  if(onPet){el.style.left='14%';el.style.top='52%';}else{el.style.right='14%';el.style.top='18%';}
+  document.getElementById('fx').appendChild(el);setTimeout(()=>el.remove(),1000);
+}
+function showLog(txt){
+  const l=document.getElementById('log'),el=document.createElement('span');
+  el.className='log-line';el.textContent=txt;l.innerHTML='';l.appendChild(el);
 }
 
-// ── 결과 처리 ─────────────────────────────────────────────────
-async function processResult(data) {
-    if (!data) return;
-    if (data.game_state) gameState = data.game_state;
-
-    // 로그
-    if (data.logs?.length) {
-        for (const log of data.logs) {
-            if (log && log.trim()) showLog(log.replace(/\*\*/g,''));
-            await sleep(300);
-        }
-    }
-
-    // 내 공격 데미지
-    if (data.pet_dmg > 0) showDmgNumber(data.pet_dmg, data.pet_crit, false);
-
-    // 몬스터 반격 — 딜레이 후 재생
-    const delay = data.mon_anim_delay ?? 800;
-    if (data.mon_dmg > 0) {
-        await playMonsterAnim(data.mon_dmg, delay);
-    }
-
-    // 종료/패배/결과 화면
-    if (data.phase === 'ended') {
-        const reward = data.reward || 0;
-        document.getElementById('result-title').textContent = reward > 0 ? '🏆 종료!' : '🏳️ 포기';
-        document.getElementById('result-desc').textContent  = `${data.floor||0}층  |  ${data.msg||''}`;
-        document.getElementById('btn-continue').style.display = 'none';
-        document.getElementById('btn-end-game').textContent = '✅ 확인';
-        document.getElementById('result-screen').classList.add('show');
-        return;
-    }
-    if (data.phase === 'defeat') {
-        document.getElementById('result-title').textContent = '💀 전멸...';
-        document.getElementById('result-desc').textContent  =
-            `${gameState?.floor||'?'}층에서 쓰러졌습니다. 배팅금 몰수.`;
-        document.getElementById('btn-continue').style.display = 'none';
-        document.getElementById('btn-end-game').textContent = '✅ 확인';
-        document.getElementById('result-screen').classList.add('show');
-        return;
-    }
-    if (data.phase === 'result') {
-        const reward = data.reward || 0;
-        document.getElementById('result-title').textContent = '✅ 처치!';
-        document.getElementById('result-desc').textContent  =
-            `${(gameState?.floor||1)-1}층  |  승리 ${gameState?.wins||0}판  |  예상 보상 ${fmtCoin(reward)}`;
-        document.getElementById('btn-continue').style.display = 'flex';
-        document.getElementById('btn-end-game').textContent = `🏆 종료 (+${fmtCoin(reward)})`;
-        document.getElementById('result-screen').classList.add('show');
-        return;
-    }
-
-    // 상점
-    if (data.phase === 'shop') {
-        document.getElementById('result-screen').classList.remove('show');
-        showShopScreen();
-        return;
-    }
-    // 이벤트
-    if (data.phase === 'event') {
-        document.getElementById('result-screen').classList.remove('show');
-        showEventScreen();
-        return;
-    }
-    // 일반 전투 — 결과 화면 닫고 렌더
-    document.getElementById('result-screen').classList.remove('show');
-    renderAll();
-    actionLocked = false;
-    renderButtons();
+// ════════════════════════════════════════════════════════
+// 상점 / 이벤트 / 모달
+// ════════════════════════════════════════════════════════
+function showShop(){
+  const items=G?.shop_items||[];
+  document.getElementById('mt').textContent='🏪 바이퍼의 상점';
+  document.getElementById('mc').innerHTML=
+    `<p style="color:#aaa;margin-bottom:8px">🍃 은잎: <b style="color:#6ee7b7">${G.silver||0}</b></p>`+
+    items.map((item,i)=>{
+      const lbl=item.type==='potion'?`🧪 ${item.name} — ${item.cost||0}🍃`:`🗡️ ${item.name} — ${item.cost||0}🍃`;
+      const dis=(item.cost||0)>(G.silver||0)?'disabled':'';
+      return `<button class="mbtn" onclick="buyItem(${i})" ${dis}>${lbl}</button>`;
+    }).join('')+
+    `<button class="mbtn" style="margin-top:6px" onclick="skipShop()">⏭️ 스킵</button>`;
+  document.getElementById('modal').classList.add('show');
+}
+async function buyItem(idx){
+  closeM();
+  try{const d=await callAPI('buy',{idx});await handleResult(d);}
+  catch(e){showLog('⚠️ '+e.message);render();}
+}
+async function skipShop(){
+  closeM();
+  try{const d=await callAPI('skip_shop');await handleResult(d);}
+  catch(e){showLog('⚠️ '+e.message);render();}
 }
 
-// ── 애니메이션 ────────────────────────────────────────────────
-async function playActionAnim(action) {
-    const pet = gameState?.party?.[gameState.active];
-    if (!pet) return;
-
-    if (['skill1','skill2','ult','secret'].includes(action)) {
-        const petEl = document.getElementById('pet-sprite');
-        petEl.classList.add('attack');
-        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, true);
-        showEffect(pet.element);
-        await sleep(350);
-
-        const monEl = document.getElementById('mon-sprite');
-        monEl.classList.add('hit');
-        document.getElementById('battle-bg').classList.add('hit-flash');
-        await sleep(300);
-        monEl.classList.remove('hit');
-        document.getElementById('battle-bg').classList.remove('hit-flash');
-
-        petEl.classList.remove('attack');
-        drawPetSprite('pet-sprite', pet.name, pet.hp/pet.max_hp, false);
-
-    } else if (action === 'parry') {
-        showEffectText('⚡ 패링!', '#f97316'); await sleep(200);
-    } else if (action === 'defend') {
-        showEffectText('🛡️ 방어!', '#60a5fa'); await sleep(200);
-    } else if (action === 'opportunity') {
-        showEffectText('⚡ 기회!', '#a3e635'); await sleep(200);
-    }
+function showEvent(){
+  const evt=G?.current_event||{};
+  document.getElementById('mt').textContent=`🎪 이벤트 — ${evt.name||'이벤트'}`;
+  document.getElementById('mc').innerHTML=
+    `<p style="color:#ccc;margin-bottom:10px">${evt.emoji||''} ${evt.desc||''}</p>`+
+    `<button class="mbtn" onclick="acceptEvent()">✅ 수락</button>`;
+  document.getElementById('modal').classList.add('show');
+}
+async function acceptEvent(){
+  closeM();
+  try{const d=await callAPI('event_accept');await handleResult(d);}
+  catch(e){showLog('⚠️ '+e.message);render();}
 }
 
-async function playMonsterAnim(dmg, delayMs=800) {
-    if (delayMs > 0) await sleep(delayMs);
-    const monEl = document.getElementById('mon-sprite');
-    monEl.classList.add('mon-attack');
-    showEffectText('👹 공격!', '#ff6060');
-    await sleep(350);
-    monEl.classList.remove('mon-attack');
-
-    const petEl = document.getElementById('pet-sprite');
-    petEl.style.filter = 'brightness(2) saturate(0)';
-    showDmgNumber(dmg, false, true);
-    await sleep(300);
-    petEl.style.filter = '';
-    // canvas 펫 다시 그리기
-    const _ap = gameState?.party?.[gameState?.active];
-    if (_ap) drawPetSprite('pet-sprite', _ap.name, _ap.hp/_ap.max_hp, false);
+function showResult(){
+  const g=G;
+  if(g.phase==='defeat'){
+    document.getElementById('rt').textContent='💀 전멸...';
+    document.getElementById('rd').textContent=`${g.floor}층에서 쓰러짐`;
+    document.getElementById('r-cont').style.display='none';
+  }else{
+    document.getElementById('rt').textContent='✅ 처치!';
+    document.getElementById('rd').textContent=`${g.floor-1}층  승리 ${g.wins}판`;
+    document.getElementById('r-cont').style.display='flex';
+  }
+  document.getElementById('result').classList.add('show');
 }
 
-// ── 결과/상점/이벤트 화면 ────────────────────────────────────
-function showResultScreen(type) {
-    const g = gameState;
-    if (type === 'defeat') {
-        document.getElementById('result-title').textContent = '💀 전멸...';
-        document.getElementById('result-desc').textContent  = `${g?.floor||'?'}층에서 쓰러졌습니다`;
-        document.getElementById('btn-continue').style.display = 'none';
-        document.getElementById('btn-end-game').textContent = '✅ 확인';
-    } else if (type === 'result') {
-        document.getElementById('result-title').textContent = '✅ 처치!';
-        document.getElementById('result-desc').textContent  = `${(g?.floor||1)-1}층 | 승리 ${g?.wins||0}판`;
-        document.getElementById('btn-continue').style.display = 'flex';
-        document.getElementById('btn-end-game').textContent = '🏆 종료';
-    } else {
-        document.getElementById('result-title').textContent = '🏆 종료!';
-        document.getElementById('result-desc').textContent  = `${g?.floor||0}층`;
-        document.getElementById('btn-continue').style.display = 'none';
-        document.getElementById('btn-end-game').textContent = '✅ 확인';
-    }
-    document.getElementById('result-screen').classList.add('show');
+function openPot(){
+  const pots=Object.entries(G.potions||{}).filter(([,v])=>v>0);
+  if(!pots.length)return;
+  document.getElementById('mt').textContent='🧪 포션 선택';
+  document.getElementById('mc').innerHTML=
+    pots.map(([n,q])=>`<button class="mbtn" onclick="usePot('${n}')">${n} ×${q}</button>`).join('');
+  document.getElementById('modal').classList.add('show');
 }
+function usePot(n){closeM();act('potion',{potion_name:n});}
 
-function showShopScreen() {
-    const g     = gameState;
-    const items = g.shop_items || [];
-    document.getElementById('modal-title').textContent = '🏪 바이퍼의 상점';
-    document.getElementById('modal-content').innerHTML =
-        `<p style="color:#aaa;margin-bottom:8px">🍃 은잎: <b style="color:#6ee7b7">${g.silver||0}</b></p>` +
-        items.map((item,i) => {
-            const label = item.type==='potion'
-                ? `🧪 ${item.name} — ${item.cost||0}🍃`
-                : `🗡️ ${item.name} — ${item.cost||0}🍃`;
-            const dis = (item.cost||0) > (g.silver||0) ? 'disabled style="opacity:0.4"' : '';
-            return `<button class="modal-btn" onclick="buyShopItem(${i})" ${dis}>${label}</button>`;
-        }).join('') +
-        `<button class="modal-btn" style="margin-top:8px" onclick="skipShop()">⏭️ 스킵</button>`;
-    document.getElementById('modal-overlay').classList.add('show');
+function openSwap(){
+  const others=G.party.filter((p,i)=>p.alive&&i!==G.active);
+  if(!others.length)return;
+  document.getElementById('mt').textContent='🔄 펫 교체';
+  document.getElementById('mc').innerHTML=
+    G.party.map((p,i)=>p.alive&&i!==G.active?`<button class="mbtn" onclick="swapTo(${i})">${p.emoji||'🐾'} ${p.name} Lv.${p.level}  HP:${p.hp}/${p.max_hp}</button>`:'').join('');
+  document.getElementById('modal').classList.add('show');
 }
+function swapTo(i){closeM();act('swap',{swap_idx:i});}
+function closeM(){document.getElementById('modal').classList.remove('show');}
 
-async function buyShopItem(idx) {
-    closeModal();
-    const r = await fetch(`${API}/api/game/action`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({token, action:'buy', extra:{idx}})
-    });
-    if (r.ok) { const d=await r.json(); await processResult(d); }
-    else { renderAll(); }
-}
+// ════════════════════════════════════════════════════════
+// 유틸
+// ════════════════════════════════════════════════════════
+function fmt(n){if(!n)return'0';if(n>=100000000)return(n/1e8).toFixed(1)+'억';if(n>=10000)return~~(n/10000)+'만';return n.toLocaleString();}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function disableAll(v){document.querySelectorAll('.btn').forEach(b=>b.disabled=v);}
+function err(msg){document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-size:17px;color:#f66;padding:20px">${msg}</div>`;}
 
-async function skipShop() {
-    closeModal();
-    const data = await callAction('skip_shop');
-    await processResult(data);
-}
-
-function showEventScreen() {
-    const evt = gameState?.current_event || {};
-    document.getElementById('modal-title').textContent = `🎪 이벤트 — ${evt.name||'이벤트'}`;
-    document.getElementById('modal-content').innerHTML =
-        `<p style="color:#ccc;margin-bottom:10px">${evt.emoji||''} ${evt.desc||''}</p>
-         <button class="modal-btn" onclick="acceptEvent()">✅ 수락</button>`;
-    document.getElementById('modal-overlay').classList.add('show');
-}
-
-async function acceptEvent() {
-    closeModal();
-    const data = await callAction('event_accept');
-    await processResult(data);
-}
-
-async function callAction(action, extra={}) {
-    try {
-        const r = await fetch(`${API}/api/game/action`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({token, action, extra})
-        });
-        if (r.ok) return await r.json();
-    } catch(e) {}
-    return simulateAction(action, extra);
-}
-
-// ── 포션/교체 모달 ────────────────────────────────────────────
-function openPotion() {
-    const g    = gameState;
-    const pots = Object.entries(g.potions||{}).filter(([,v])=>v>0);
-    if (!pots.length) return;
-    document.getElementById('modal-title').textContent = '🧪 포션 선택';
-    document.getElementById('modal-content').innerHTML =
-        pots.map(([name,qty])=>
-            `<button class="modal-btn" onclick="usePotion('${name}')">${name} ×${qty}</button>`
-        ).join('');
-    document.getElementById('modal-overlay').classList.add('show');
-}
-function usePotion(name) { closeModal(); doAction('potion', {potion_name:name}); }
-
-function openSwap() {
-    const g = gameState;
-    document.getElementById('modal-title').textContent = '🔄 펫 교체';
-    document.getElementById('modal-content').innerHTML =
-        g.party.map((p,i) =>
-            p.alive && i !== g.active
-            ? `<button class="modal-btn" onclick="swapPet(${i})">${p.emoji||'🐾'} ${p.name} Lv.${p.level}  HP:${p.hp}/${p.max_hp}</button>`
-            : ''
-        ).join('');
-    document.getElementById('modal-overlay').classList.add('show');
-}
-function swapPet(idx) { closeModal(); doAction('swap', {swap_idx:idx}); }
-function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
-
-// ── 로컬 시뮬레이션 (서버 없을 때 폴백) ─────────────────────
-function simulateAction(action, extra={}) {
-    const g   = gameState;
-    const pet = g.party[g.active];
-    const mon = g.monster;
-    const logs = [];
-    let pet_dmg=0, pet_crit=false, mon_dmg=0;
-
-    // 결과/종료 화면 버튼
-    if (action === 'end' || action === 'give_up') {
-        g.phase = 'ended';
-        return {phase:'ended', reward:0, floor:g.floor-1, msg:'(테스트 — 실제 보상 없음)'};
-    }
-    if (action === 'continue') {
-        g.monster = makeTestMon(g.floor, g.top_grade||'common');
-        g.phase = 'battle';
-        document.getElementById('result-screen').classList.remove('show');
-        return {phase:'battle', game_state:g, logs:[`⚔️ ${g.floor}층 도전!`], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-    }
-    if (action === 'skip_shop') {
-        g.phase = 'battle';
-        g.monster = makeTestMon(g.floor, g.top_grade||'common');
-        return {phase:'battle', game_state:g, logs:['⏭️ 상점 스킵'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-    }
-    if (action === 'event_accept') {
-        g.phase = 'battle';
-        g.monster = makeTestMon(g.floor, g.top_grade||'common');
-        g.current_event = null;
-        return {phase:'battle', game_state:g, logs:['✅ 이벤트 수락!'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-    }
-
-    // 포션
-    if (action === 'potion') {
-        const pname = extra.potion_name||'';
-        if (!pname || !g.potions[pname] || g.potions[pname]<=0)
-            return {phase:'battle', game_state:g, logs:['포션 없음'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-        g.potions[pname]--;
-        if (pname==='HP포션')      { const h=Math.floor(pet.max_hp*0.3); pet.hp=Math.min(pet.max_hp,pet.hp+h); logs.push(`🧪 HP+${h}!`); }
-        else if (pname==='신비한포션') { pet.hp=pet.max_hp; logs.push('✨ 완전 회복!'); }
-        else if (pname==='크리포션')   { pet.buffs.push({type:'crit_boost',value:1,duration:1}); logs.push('⚗️ 크리 확정!'); }
-        else if (pname==='마력포션')   { pet.cur_mana=pet.max_mana; logs.push('💙 마나 충전!'); }
-        return {phase:'battle', game_state:g, logs, pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-    }
-
-    // 교체
-    if (action === 'swap') {
-        const idx = extra.swap_idx ?? -1;
-        if (idx>=0 && idx<g.party.length && g.party[idx].alive) {
-            g.active = idx;
-            logs.push(`🔄 ${g.party[idx].name} 출전!`);
-        }
-        return {phase:'battle', game_state:g, logs, pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-    }
-
-    // 스킬
-    if (['skill1','skill2','ult','secret'].includes(action)) {
-        const skill = pet.skills?.[action];
-        if (!skill) return {phase:'battle', game_state:g, logs:['스킬 없음'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-        const mc = skill.mana||10;
-        if (pet.cur_mana < mc) return {phase:'battle', game_state:g, logs:['마나 부족!'], pet_dmg:0, mon_dmg:0, mon_anim_delay:0};
-        if (action !== 'ult') pet.cur_mana -= mc;
-
-        let raw = Math.max(1, Math.floor(pet.atk*(skill.dmg_mult||1.0)) - Math.floor(mon.def/2));
-        // 기회 버프
-        const oppBuff = (pet.buffs||[]).find(b=>b.type==='opportunity');
-        if (oppBuff) raw = Math.floor(raw * 1.3);
-        pet_crit = (pet.buffs||[]).some(b=>b.type==='crit_boost') || Math.random()<0.10;
-        pet_dmg  = pet_crit ? Math.floor(raw*1.8) : raw;
-        pet_dmg  = Math.floor(pet_dmg * (0.9+Math.random()*0.2));
-        pet_dmg  = Math.min(pet_dmg, Math.floor(mon.max_hp*0.60)); // 60% 캡
-        mon.hp   = Math.max(0, mon.hp - pet_dmg);
-
-        if (action==='ult') pet.ult_gauge=0;
-        else pet.ult_gauge = Math.min(7, pet.ult_gauge+(skill.ult_gain||1));
-        pet.buffs = (pet.buffs||[]).filter(b=>b.type!=='opportunity'&&b.type!=='crit_boost');
-
-        logs.push(`⚔️ ${skill.name} → ${pet_dmg} 피해${pet_crit?' 💥크리!':''}`);
-        showDmgNumber(pet_dmg, pet_crit, false);
-
-    } else if (action==='defend') {
-        pet.buffs = pet.buffs||[];
-        pet.buffs.push({type:'dmg_reduce',value:0.35,duration:1});
-        logs.push('🛡️ 방어 태세!');
-    } else if (action==='opportunity') {
-        pet.buffs = pet.buffs||[];
-        pet.buffs.push({type:'opportunity',value:0.30,duration:1});
-        logs.push('⚡ 기회 포착!');
-    }
-
-    // 몬스터 처치
-    if (mon.hp <= 0) {
-        g.wins++;
-        g.silver += mon.silver || Math.floor(Math.random()*3)+1;
-        g.gold   += mon.gold   || 0;
-        logs.push(`🏆 ${mon.name} 처치!`);
-        g.party.forEach(p=>{ if(p.alive) p.hp=Math.min(p.max_hp, p.hp+Math.floor(p.max_hp*0.15)); });
-        const nf = g.floor+1;
-
-        if (g.wins % 3 === 0) {
-            g.phase='shop'; g.floor=nf;
-            g.shop_items=[
-                {type:'potion',name:'HP포션',cost:3},
-                {type:'potion',name:'크리포션',cost:4},
-                {type:'potion',name:'마력포션',cost:4},
-            ];
-        } else if (g.wins >= 3) {
-            g.phase='result'; g.floor=nf;
-            return {phase:'result', game_state:g, logs, pet_dmg, pet_crit, mon_dmg:0, reward:0, mon_anim_delay:0};
-        } else {
-            g.floor=nf; g.monster=makeTestMon(nf, g.top_grade||'common'); g.phase='battle';
-        }
-        g.parry_available=false;
-        return {phase:g.phase, game_state:g, logs, pet_dmg, pet_crit, mon_dmg:0, mon_anim_delay:0};
-    }
-
-    // 몬스터 반격
-    const defBonus = (pet.buffs||[]).filter(b=>b.type==='dmg_reduce').reduce((s,b)=>s+b.value,0);
-    const bm = mon.is_boss ? 1.8 : 1.0;
-    mon_dmg = Math.max(1, Math.floor(mon.atk*bm*(0.85+Math.random()*0.3)) - Math.floor(pet.def/2));
-    mon_dmg = Math.floor(mon_dmg*(1-Math.min(0.8,defBonus)));
-
-    const patterns = mon.pattern||['기본 공격'];
-    const pname    = patterns[(mon.pattern_idx||0) % patterns.length];
-    mon.pattern_idx = ((mon.pattern_idx||0)+1) % patterns.length;
-    logs.push(`👹 ${mon.name}의 ${pname} → ${mon_dmg} 피해!`);
-    g.parry_available=true; g.pending_parry_dmg=mon_dmg;
-    pet.hp = Math.max(0, pet.hp - mon_dmg);
-
-    // 버프 턴 감소
-    pet.buffs = (pet.buffs||[]).map(b=>({...b,duration:b.duration-1})).filter(b=>b.duration>0);
-    pet.cur_mana = Math.min(pet.max_mana, pet.cur_mana+Math.floor(pet.max_mana*0.15));
-
-    // 펫 사망 처리
-    if (pet.hp <= 0) {
-        pet.alive = false;
-        logs.push(`💀 ${pet.name} 전투불능!`);
-        let nxt = -1;
-        for (let i=0; i<g.party.length; i++) {
-            if (g.party[i].alive && i!==g.active) { nxt=i; break; }
-        }
-        if (nxt >= 0) {
-            g.active=nxt;
-            logs.push(`🔄 ${g.party[nxt].name} 출전!`);
-        } else {
-            g.phase='defeat';
-            return {phase:'defeat', game_state:g, logs, pet_dmg, pet_crit, mon_dmg, mon_anim_delay:0};
-        }
-    }
-
-    return {phase:'battle', game_state:g, logs, pet_dmg, pet_crit, mon_dmg, mon_anim_delay:800};
-}
-
-function makeTestMon(floor, topGrade='common') {
-    // 등급별 베이스 HP (1층 기준, 2~3턴에 처치 가능한 수준)
-    const base = {common:150,uncommon:280,rare:500,legendary:900,
-                  mythic:1400,spirit:2000,immortal:2800,celestial:4000,admin:6000};
-    const bHP  = base[topGrade]||150;
-    const fm   = 1.0 + (floor-1)*0.08;
-    const names = ['독 안개 슬라임','붉은 박쥐','철갑 거북','불꽃 도깨비','사막 전갈','얼음 여우'];
-    const elems = ['불','물','번개','풀','어둠','얼음','물리'];
-    const isBoss  = floor%10===0;
-    const isElite = floor%5===0 && !isBoss;
-    const bm = isBoss?2.0:(isElite?1.4:1.0);
-    const hp = Math.floor(bHP*fm*bm);
-    return {
-        name:names[Math.floor(Math.random()*names.length)],
-        emoji:'👹',
-        element:elems[Math.floor(Math.random()*elems.length)],
-        hp, max_hp:hp,
-        atk:Math.floor(bHP*0.22*fm*bm),
-        def:Math.floor(bHP*0.06*fm),
-        spd:50, is_boss:isBoss, is_elite:isElite,
-        level:Math.floor((floor-1)/10),
-        pattern:['기본 공격','강타'], pattern_idx:0,
-        buffs:[], debuffs:[],
-        silver:Math.floor(Math.random()*3)+1, gold:isBoss?1:0,
-    };
-}
-
-// ── 이펙트 ───────────────────────────────────────────────────
-const ELEM_EFFECT_ICON = {불:'🔥',물:'💧',번개:'⚡',풀:'🌿',어둠:'🌑',얼음:'❄️',물리:'⚔️'};
-function showEffect(elem) {
-    const layer = document.getElementById('effect-layer');
-    const el = document.createElement('div');
-    el.className = 'effect-text';
-    el.textContent = ELEM_EFFECT_ICON[elem]||'✨';
-    el.style.cssText = 'right:160px;top:35%;font-size:48px';
-    layer.appendChild(el);
-    setTimeout(()=>el.remove(), 900);
-}
-function showEffectText(text, color) {
-    const layer = document.getElementById('effect-layer');
-    const el = document.createElement('div');
-    el.className = 'effect-text';
-    el.textContent = text;
-    el.style.cssText = `color:${color||'#fff'};left:50%;top:40%;transform:translateX(-50%);font-size:28px`;
-    layer.appendChild(el);
-    setTimeout(()=>el.remove(), 900);
-}
-function showDmgNumber(dmg, isCrit, onPet=false) {
-    const layer = document.getElementById('effect-layer');
-    const el = document.createElement('div');
-    el.className = 'dmg-number';
-    el.textContent = (isCrit?'💥':'-') + dmg.toLocaleString();
-    el.style.color  = isCrit?'#FFD700':(onPet?'#ff4444':'#ff8888');
-    el.style.cssText += onPet ? ';left:12%;top:55%' : ';right:12%;top:18%';
-    layer.appendChild(el);
-    setTimeout(()=>el.remove(), 1000);
-}
-function showLog(text) {
-    const log = document.getElementById('battle-log');
-    const el  = document.createElement('span');
-    el.className   = 'log-line';
-    el.textContent = text;
-    log.innerHTML  = '';
-    log.appendChild(el);
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-function getElemAdv(a, b) {
-    const adv = {불:{풀:'🔼유리',얼음:'🔼유리',물:'🔽불리'},물:{불:'🔼유리',번개:'🔽불리'},
-                 번개:{물:'🔼유리',풀:'🔽불리'},풀:{물:'🔼유리',번개:'🔼유리',불:'🔽불리'},
-                 어둠:{풀:'🔼유리'},얼음:{불:'🔽불리',번개:'🔽불리'}};
-    return (adv[a]&&adv[a][b])||'➡보통';
-}
-function calcParryRate(pet, mon) {
-    const ps=pet.speed||60, ms=mon.spd||50;
-    return Math.min(65, Math.floor(ps/(ps+ms)*100));
-}
-function fmtCoin(n) {
-    if (!n) return '0';
-    if (n>=100000000) return (n/100000000).toFixed(1)+'억';
-    if (n>=10000)     return (n/10000).toFixed(0)+'만';
-    return n.toLocaleString();
-}
-function setAllDisabled(v) {
-    document.querySelectorAll('.skill-btn').forEach(b=>b.disabled=v);
-}
-function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
-function showError(msg) {
-    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-size:18px;color:#ff6060;padding:20px">${msg}</div>`;
-}
-
-function getDemoState() {
-    return {
-        floor:1, wins:0, silver:0, gold:0, bet:10000, phase:'battle',
-        top_grade:'common',
-        party:[{
-            name:'드래곤', emoji:'🔴', grade:'mythic', element:'불',
-            level:10, hp:700, max_hp:700, atk:230, def:140,
-            cur_mana:80, max_mana:130, ult_gauge:3, alive:true, speed:70,
-            skills:{
-                skill1:{name:'드래곤 클로', mana:20, dmg_mult:1.4, ult_gain:1},
-                skill2:{name:'화염 브레스', mana:40, dmg_mult:2.0, ult_gain:2},
-                ult:{name:'용의 분노', mana:0, dmg_mult:3.0},
-            },
-            skill_cd:{}, buffs:[], debuffs:[],
-        }],
-        active:0,
-        monster:makeTestMon(1, 'common'),
-        potions:{'HP포션':3}, parry_available:false,
-    };
-}
-
-// ── 시작 ─────────────────────────────────────────────────────
-initGame();
+// ════════════════════════════════════════════════════════
+// 시작
+// ════════════════════════════════════════════════════════
+(async()=>{
+  try{
+    const r=await fetch(`${API}/api/game/state?token=${token}`);
+    if(!r.ok){err('게임 세션이 없습니다.<br>Discord에서 <b>/블레나 시작</b> 을 먼저 하세요.');return;}
+    G=await r.json();
+    render();
+  }catch(e){
+    err('서버에 연결할 수 없습니다.<br>잠시 후 다시 시도하세요.<br><small>'+e.message+'</small>');
+  }
+})();
 </script>
 </body>
 </html>
