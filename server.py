@@ -4,6 +4,7 @@ from fastapi import FastAPI,HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+sys.path.insert(0,os.path.dirname(os.path.dirname(__file__)))
 app=FastAPI()
 app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_methods=["*"],allow_headers=["*"])
 HTML_PATH=os.path.join(os.path.dirname(__file__),"game.html")
@@ -46,23 +47,51 @@ def _tick_mon(mon):
         d["duration"]-=1
         if d["duration"]>=0: kept.append(d)
     mon["debuffs"]=kept
+# bat_data 미리 로드 (discord 없이도 동작)
+_NM=_EM_=_BM=_FB=_HB=None
+def _load_mon_data():
+    global _NM,_EM_,_BM,_FB,_HB
+    if _NM is not None: return True
+    try:
+        import sys as _sys
+        # discord mock — bat_data가 간접적으로 helpers를 import할 수 있음
+        if "discord" not in _sys.modules:
+            from unittest.mock import MagicMock
+            _sys.modules["discord"]=MagicMock()
+            _sys.modules["discord.ext"]=MagicMock()
+            _sys.modules["discord.ext.commands"]=MagicMock()
+        from cogs.bat_data import NORMAL_MONSTERS,ELITE_MONSTERS,BOSS_MONSTERS,FIXED_BOSSES,HIDDEN_BOSSES
+        _NM=NORMAL_MONSTERS; _EM_=ELITE_MONSTERS; _BM=BOSS_MONSTERS; _FB=FIXED_BOSSES; _HB=HIDDEN_BOSSES
+        return True
+    except Exception as e:
+        print(f"[mon_data] {e}"); return False
+
 def _mon(floor,tg="common"):
+    # 1순위: blackarena.build_monster (봇 실행 중일 때)
     try:
         from cogs.blackarena import build_monster; return build_monster(floor,tg)
     except: pass
-    try:
-        from cogs.bat_data import NORMAL_MONSTERS,ELITE_MONSTERS,BOSS_MONSTERS,FIXED_BOSSES,HIDDEN_BOSSES
-        m=(1+(floor-1)*0.06)*GSCALE.get(tg,1.0)
-        if floor in HIDDEN_BOSSES: b=copy.deepcopy(HIDDEN_BOSSES[floor]); b["is_boss"]=True; m*=1.5
-        elif floor in FIXED_BOSSES: b=copy.deepcopy(FIXED_BOSSES[floor]); b["is_boss"]=True; m*=1.5
-        elif floor%10==0: b=copy.deepcopy(random.choice(BOSS_MONSTERS)); b["is_boss"]=True; b["is_elite"]=False; m*=1.5
-        elif floor%5==0: b=copy.deepcopy(random.choice(ELITE_MONSTERS)); b["is_boss"]=False; b["is_elite"]=True; m*=1.2
-        else: b=copy.deepcopy(random.choice(NORMAL_MONSTERS)); b["is_boss"]=False; b["is_elite"]=False
-        b.update({"max_hp":max(50,int(b["hp"]*m)),"hp":max(50,int(b["hp"]*m)),"atk":max(5,int(b["atk"]*m)),"def":max(1,int(b["def"]*m)),"level":min(10,(floor-1)//10),"buffs":[],"debuffs":[],"pattern_idx":0})
-        if "pattern" not in b: b["pattern"]=["기본 공격","강타"]
-        return b
-    except:
-        hp=max(80,int(100*(1+(floor-1)*0.06))); return {"name":"슬라임","emoji":"🟢","element":"풀","hp":hp,"max_hp":hp,"atk":max(5,int(30*(1+(floor-1)*0.06))),"def":max(1,int(10*(1+(floor-1)*0.06))),"spd":10,"is_boss":False,"is_elite":False,"level":(floor-1)//10,"pattern":["기본 공격"],"pattern_idx":0,"buffs":[],"debuffs":[],"silver":2,"gold":0}
+    # 2순위: bat_data 직접 사용
+    if _load_mon_data():
+        try:
+            m=(1+(floor-1)*0.06)*GSCALE.get(tg,1.0)
+            if floor in _HB: b=copy.deepcopy(_HB[floor]); b["is_boss"]=True; m*=1.5
+            elif floor in _FB: b=copy.deepcopy(_FB[floor]); b["is_boss"]=True; m*=1.5
+            elif floor%10==0: b=copy.deepcopy(random.choice(_BM)); b["is_boss"]=True; b["is_elite"]=False; m*=1.5
+            elif floor%5==0: b=copy.deepcopy(random.choice(_EM_)); b["is_boss"]=False; b["is_elite"]=True; m*=1.2
+            else: b=copy.deepcopy(random.choice(_NM)); b["is_boss"]=False; b["is_elite"]=False
+            b.update({"max_hp":max(50,int(b["hp"]*m)),"hp":max(50,int(b["hp"]*m)),"atk":max(5,int(b["atk"]*m)),"def":max(1,int(b["def"]*m)),"level":min(10,(floor-1)//10),"buffs":[],"debuffs":[],"pattern_idx":0})
+            if "pattern" not in b: b["pattern"]=["기본 공격","강타"]
+            if "silver" not in b: b["silver"]=random.randint(1,3)
+            if "gold" not in b: b["gold"]=1 if b.get("is_boss") else 0
+            return b
+        except Exception as e:
+            print(f"[_mon] {e}")
+    # 폴백: 랜덤 속성 일반 몬스터
+    elems=["불","물","번개","풀","어둠","얼음","물리"]
+    names=["붉은 박쥐","철갑 거북","사막 전갈","폐허 고블린","얼음 여우","용암 벌레","어둠 고양이","모래 도적"]
+    hp=max(80,int(100*(1+(floor-1)*0.06))*GSCALE.get(tg,1.0))
+    return {"name":random.choice(names),"emoji":"👹","element":random.choice(elems),"hp":int(hp),"max_hp":int(hp),"atk":max(5,int(30*(1+(floor-1)*0.06))),"def":max(1,int(10*(1+(floor-1)*0.06))),"spd":10,"is_boss":False,"is_elite":False,"level":(floor-1)//10,"pattern":["기본 공격","강타"],"pattern_idx":0,"buffs":[],"debuffs":[],"silver":random.randint(1,3),"gold":0}
 def _shop(g):
     items=[]
     for p in random.sample(SPOOL,min(3,len(SPOOL))): items.append({"type":"potion","name":p,"cost":PCOST.get(p,3)})
@@ -162,7 +191,7 @@ async def _battle(g,uid,a,ex):
     if a=="give_up":
         reward=_reward(g) if g["wins"]>=3 else 0; ag.pop(uid,None)
         if bot_ref and reward:
-            try: await bot_ref.db.update_coins(uid,g.get("gid",0),reward); await bot_ref.db.log_gamble(uid,g.get("gid",0),"블레나",g["bet"],f"포기",reward-g["bet"])
+            try: await bot_ref.db.update_yak(uid,g.get("gid",0),reward); await bot_ref.db.log_gamble(uid,g.get("gid",0),"블레나",g["bet"],f"포기",reward-g["bet"])
             except: pass
         return {"phase":"ended","reward":reward,"floor":g["floor"]-1,"msg":f"🏳️ {'💰 '+str(reward)+'코인' if reward else '보상없음'}"}
     if a=="parry":
@@ -248,7 +277,7 @@ async def action(req:R):
         if a=="end":
             rw=_reward(g); ag.pop(uid,None)
             if bot_ref and rw:
-                try: await bot_ref.db.update_coins(uid,g.get("gid",0),rw); await bot_ref.db.log_gamble(uid,g.get("gid",0),"블레나",g["bet"],f"{g['floor']-1}층",rw-g["bet"])
+                try: await bot_ref.db.update_yak(uid,g.get("gid",0),rw); await bot_ref.db.log_gamble(uid,g.get("gid",0),"블레나",g["bet"],f"{g['floor']-1}층",rw-g["bet"])
                 except: pass
             return {"phase":"ended","reward":rw,"floor":g["floor"]-1,"msg":f"💰 {rw:,}코인!"}
         if a=="continue":
