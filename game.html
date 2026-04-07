@@ -104,6 +104,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 
 <div id="hud">
   <div class="floor">⚔️ BLACK ARENA TOWER | <span id="fl">1</span>층</div>
+  <div id="elem-adv" style="font-size:12px;color:#FFD700;font-weight:700"></div>
   <div class="res">
     <span>💰<span id="bet">-</span></span>
     <span>🍃<span id="slv">0</span></span>
@@ -114,8 +115,8 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 
 <div id="arena">
   <div id="bg"></div>
-  <canvas id="pet-cv" width="180" height="180"></canvas>
-  <canvas id="mon-cv" width="180" height="180"></canvas>
+  <img id="pet-cv" width="180" height="180" src="" style="object-fit:contain;background:transparent">
+  <img id="mon-cv" width="180" height="180" src="" style="object-fit:contain;background:transparent;transform:scaleX(-1)">
   <div id="fx"></div>
   <div id="log"></div>
   <div id="mon-ui">
@@ -174,6 +175,115 @@ let locked = false;
 // ════════════════════════════════════════════════════════
 // canvas 스프라이트 — 검은 배경 없음
 // ════════════════════════════════════════════════════════
+// ── 이미지 URL ──────────────────────────────────────────────────
+const B = 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main';
+const PET_URL = {
+  토끼:{i:B+'/%ED%86%A0%EB%81%BC_idle.png',a:B+'/%ED%86%A0%EB%81%BC_attack.png'},
+  강아지:{i:B+'/%EA%B0%95%EC%95%84%EC%A7%80_idle.png',a:B+'/%EA%B0%95%EC%95%84%EC%A7%80_attack.png'},
+  고양이:{i:B+'/%EA%B3%A0%EC%96%91%EC%9D%B4_idle.png',a:B+'/%EA%B3%A0%EC%96%91%EC%9D%B4_attack.png'},
+  다람쥐:{i:B+'/%EB%8B%A4%EB%9E%8C%EC%A5%90_idle.png',a:B+'/%EB%8B%A4%EB%9E%8C%EC%A5%90_attack.png'},
+  돼지:{i:B+'/%EB%8F%BC%EC%A7%80_idle.png',a:B+'/%EB%8F%BC%EC%A7%80_attack.png'},
+  양:{i:B+'/%EC%96%91_idle.png',a:B+'/%EC%96%91_attack.png'},
+  말:{i:B+'/%EB%A7%90_idle.png',a:B+'/%EB%A7%90_attack.png'},
+  늑대:{i:B+'/%EB%8A%91%EB%8C%80_idle.png',a:B+'/%EB%8A%91%EB%8C%80_attack.png'},
+  고릴라:{i:B+'/%EA%B3%A0%EB%A6%B4%EB%9D%BC_idle.png',a:B+'/%EA%B3%A0%EB%A6%B4%EB%9D%BC_attack.png'},
+  코끼리:{i:B+'/%EC%BD%94%EB%81%BC%EB%A6%AC_idle.png',a:B+'/%EC%BD%94%EB%81%BC%EB%A6%AC_attack.png'},
+  판다:{i:B+'/%ED%8C%90%EB%8B%A4_idle.png',a:B+'/%ED%8C%90%EB%8B%A4_attack.png'},
+  곰:{i:B+'/%EA%B3%B0_idle.png',a:B+'/%EA%B3%B0_attack.png'},
+  독수리:{i:B+'/%EB%8F%85%EC%88%98%EB%A6%AC_idle.png',a:B+'/%EB%8F%85%EC%88%98%EB%A6%AC_attack.png'},
+  샤크:{i:B+'/%EC%83%A4%ED%81%AC_idle.png',a:B+'/%EC%83%A4%ED%81%AC_attack.png'},
+  악어:{i:B+'/%EC%95%85%EC%96%B4_idle.png',a:B+'/%EC%95%85%EC%96%B4_attack.png'},
+  사자:{i:B+'/%EC%82%AC%EC%9E%90_idle.png',a:B+'/%EC%82%AC%EC%9E%90_attack.png'},
+  호랑이:{i:B+'/%ED%98%B8%EB%9E%91%EC%9D%B4_idle.png',a:B+'/%ED%98%B8%EB%9E%91%EC%9D%B4_attack.png'},
+  유니콘:{i:B+'/%EC%9C%A0%EB%8B%88%EC%BD%98_idle.png',a:B+'/%EC%9C%A0%EB%8B%88%EC%BD%98_attack.png'},
+  티렉스:{i:B+'/%ED%8B%B0%EB%A0%89%EC%8A%A4_idle.png',a:B+'/%ED%8B%B0%EB%A0%89%EC%8A%A4_attack.png'},
+  피닉스:{i:B+'/%ED%94%BC%EB%8B%89%EC%8A%A4_idle.png',a:B+'/%ED%94%BC%EB%8B%89%EC%8A%A4_attack.png'},
+  오니:{i:B+'/%EC%98%A4%EB%8B%88_idle.png',a:B+'/%EC%98%A4%EB%8B%88_attack.png'},
+  드래곤:{i:B+'/%EB%93%9C%EB%9E%98%EA%B3%A4_idle.png',a:B+'/%EB%93%9C%EB%9E%98%EA%B3%A4_attack.png'},
+  고스트:{i:B+'/%EA%B3%A0%EC%8A%A4%ED%8A%B8_idle.png',a:B+'/%EA%B3%A0%EC%8A%A4%ED%8A%B8_attack.png'},
+  해:{i:B+'/%ED%95%B4_idle.png',a:B+'/%ED%95%B4_attack.png'},
+  달:{i:B+'/%EB%8B%AC_idle.png',a:B+'/%EB%8B%AC_attack.png'},
+  별:{i:B+'/%EB%B3%84_idle.png',a:B+'/%EB%B3%84_attack.png'},
+  운명:{i:B+'/%EC%9A%B4%EB%AA%85_idle.png',a:B+'/%EC%9A%B4%EB%AA%85_attack.png'},
+  유성:{i:B+'/%EC%9C%A0%EC%84%B1_idle.png',a:B+'/%EC%9C%A0%EC%84%B1_attack.png'},
+  미카엘:{i:B+'/%EB%AF%B8%EC%B9%B4%EC%97%98_idle.png',a:B+'/%EB%AF%B8%EC%B9%B4%EC%97%98_attack.png'},
+  라파엘:{i:B+'/%EB%9D%BC%ED%8C%8C%EC%97%98_idle.png',a:B+'/%EB%9D%BC%ED%8C%8C%EC%97%98_attack.png'},
+  가브리엘:{i:B+'/%EA%B0%80%EB%B8%8C%EB%A6%AC%EC%97%98_idle.png',a:B+'/%EA%B0%80%EB%B8%8C%EB%A6%AC%EC%97%98_attack.png'},
+  우리엘:{i:B+'/%EC%9A%B0%EB%A6%AC%EC%97%98_idle.png',a:B+'/%EC%9A%B0%EB%A6%AC%EC%97%98_attack.png'},
+  레미엘:{i:B+'/%EB%A0%88%EB%AF%B8%EC%97%98_idle.png',a:B+'/%EB%A0%88%EB%AF%B8%EC%97%98_attack.png'},
+  사리엘:{i:B+'/%EC%82%AC%EB%A6%AC%EC%97%98_idle.png',a:B+'/%EC%82%AC%EB%A6%AC%EC%97%98_attack.png'},
+  라구엘:{i:B+'/%EB%9D%BC%EA%B5%AC%EC%97%98_idle.png',a:B+'/%EB%9D%BC%EA%B5%AC%EC%97%98_attack.png'},
+  사탄:{i:B+'/%EC%82%AC%ED%83%84_idle.png',a:B+'/%EC%82%AC%ED%83%84_attack.png'},
+  루시퍼:{i:B+'/%EB%A3%A8%EC%8B%9C%ED%8D%BC_idle.png',a:B+'/%EB%A3%A8%EC%8B%9C%ED%8D%BC_attack.png'},
+  벨페고르:{i:B+'/%EB%B2%A8%ED%8E%98%EA%B3%A0%EB%A5%B4_idle.png',a:B+'/%EB%B2%A8%ED%8E%98%EA%B3%A0%EB%A5%B4_attack.png'},
+  레비아탄:{i:B+'/%EB%A0%88%EB%B9%84%EC%95%84%ED%83%84_idle.png',a:B+'/%EB%A0%88%EB%B9%84%EC%95%84%ED%83%84_attack.png'},
+  아스모데우스:{i:B+'/%EC%95%84%EC%8A%A4%EB%AA%A8%EB%8D%B0%EC%9A%B0%EC%8A%A4_idle.png',a:B+'/%EC%95%84%EC%8A%A4%EB%AA%A8%EB%8D%B0%EC%9A%B0%EC%8A%A4_attack.png'},
+  마몬:{i:B+'/%EB%A7%88%EB%AA%AC_idle.png',a:B+'/%EB%A7%88%EB%AA%AC_attack.png'},
+  바알제붑:{i:B+'/%EB%B0%94%EC%95%8C%EC%A0%9C%EB%B6%91_idle.png',a:B+'/%EB%B0%94%EC%95%8C%EC%A0%9C%EB%B6%91_attack.png'},
+  포세이돈:{i:B+'/%ED%8F%AC%EC%84%B8%EC%9D%B4%EB%8F%88_idle.png',a:B+'/%ED%8F%AC%EC%84%B8%EC%9D%B4%EB%8F%88_attack.png'},
+  제우스:{i:B+'/%EC%A0%9C%EC%9A%B0%EC%8A%A4_idle.png',a:B+'/%EC%A0%9C%EC%9A%B0%EC%8A%A4_attack.png'},
+  하데스:{i:B+'/%ED%95%98%EB%8D%B0%EC%8A%A4_idle.png',a:B+'/%ED%95%98%EB%8D%B0%EC%8A%A4_attack.png'},
+  오딘:{i:B+'/%EC%98%A4%EB%94%98_idle.png',a:B+'/%EC%98%A4%EB%94%98_attack.png'},
+  토르:{i:B+'/%ED%86%A0%EB%A5%B4_idle.png',a:B+'/%ED%86%A0%EB%A5%B4_attack.png'},
+  헤르메스:{i:B+'/%ED%97%A4%EB%A5%B4%EB%A9%94%EC%8A%A4_idle.png',a:B+'/%ED%97%A4%EB%A5%B4%EB%A9%94%EC%8A%A4_attack.png'},
+  아테나:{i:B+'/%EC%95%84%ED%85%8C%EB%82%98_idle.png',a:B+'/%EC%95%84%ED%85%8C%EB%82%98_attack.png'},
+  로키:{i:B+'/%EB%A1%9C%ED%82%A4_idle.png',a:B+'/%EB%A1%9C%ED%82%A4_attack.png'},
+  바이퍼:{i:B+'/%EB%B0%94%EC%9D%B4%ED%8D%BC_idle.png',a:B+'/%EB%B0%94%EC%9D%B4%ED%8D%BC_attack.png'},
+  우주:{i:B+'/%EC%9A%B0%EC%A3%BC_idle.png',a:B+'/%EC%9A%B0%EC%A3%BC_attack.png'},
+};
+const MON_URL = {
+  '심연의 용':{i:B+'/%EC%8B%AC%EC%97%B0%EC%9D%98%20%EC%9A%A9_idle.png',a:B+'/%EC%8B%AC%EC%97%B0%EC%9D%98%20%EC%9A%A9_attack.png'},
+  '황금 심판자':{i:B+'/%ED%99%A9%EA%B8%88%20%EC%8B%AC%ED%8C%90%EC%9E%90_idle.png',a:B+'/%ED%99%A9%EA%B8%88%20%EC%8B%AC%ED%8C%90%EC%9E%90_attack.png'},
+  '검은 왕':{i:B+'/%EA%B2%80%EC%9D%80%20%EC%99%95_idle.png',a:B+'/%EA%B2%80%EC%9D%80%20%EC%99%95_attack.png'},
+};
+// 몬스터 속성별 이미지 (불1~불4, 변종)
+const ELEM_URLS = {
+  불:[B+'/%EB%B6%881_idle.png',B+'/%EB%B6%882_idle.png',B+'/%EB%B6%883_idle.png',B+'/%EB%B6%884_idle.png'],
+  물:[B+'/%EB%AC%BC1_idle.png',B+'/%EB%AC%BC2_idle.png',B+'/%EB%AC%BC3_idle.png',B+'/%EB%AC%BC4_idle.png'],
+  번개:[B+'/%EB%B2%88%EA%B0%9C1_idle.png',B+'/%EB%B2%88%EA%B0%9C2_idle.png',B+'/%EB%B2%88%EA%B0%9C3_idle.png',B+'/%EB%B2%88%EA%B0%9C4_idle.png'],
+  풀:[B+'/%ED%92%801_idle.png',B+'/%ED%92%802_idle.png',B+'/%ED%92%803_idle.png',B+'/%ED%92%804_idle.png'],
+  어둠:[B+'/%EC%96%B4%EB%91%A01_idle.png',B+'/%EC%96%B4%EB%91%A02_idle.png',B+'/%EC%96%B4%EB%91%A03_idle.png',B+'/%EC%96%B4%EB%91%A04_idle.png'],
+  얼음:[B+'/%EC%96%BC%EC%9D%8C1_idle.png',B+'/%EC%96%BC%EC%9D%8C2_idle.png',B+'/%EC%96%BC%EC%9D%8C3_idle.png',B+'/%EC%96%BC%EC%9D%8C4_idle.png'],
+  물리:[B+'/%EB%AC%BC%EB%A6%AC1_idle.png',B+'/%EB%AC%BC%EB%A6%AC2_idle.png',B+'/%EB%AC%BC%EB%A6%AC3_idle.png',B+'/%EB%AC%BC%EB%A6%AC4_idle.png'],
+};
+const ELITE_URLS = {
+  불:B+'/%EB%B6%88%20%EB%B3%80%EC%A2%85_idle.png',
+  물:B+'/%EB%AC%BC%20%EB%B3%80%EC%A2%85_idle.png',
+  번개:B+'/%EB%B2%88%EA%B0%9C%20%EB%B3%80%EC%A2%85_idle.png',
+  풀:B+'/%ED%92%80%20%EB%B3%80%EC%A2%85_idle.png',
+  어둠:B+'/%EC%96%B4%EB%91%A0%20%EB%B3%80%EC%A2%85_idle.png',
+  얼음:B+'/%EC%96%BC%EC%9D%8C_idle.png',
+  물리:B+'/%EB%AC%BC%EB%A6%AC_idle.png',
+};
+
+function getPetUrl(name, atk=false){
+  const m=PET_URL[name]; if(!m)return'';
+  return atk?m.a:m.i;
+}
+function getMonUrl(mon, atk=false){
+  // 고정 보스
+  if(MON_URL[mon.name]){const m=MON_URL[mon.name];return atk?m.a:m.i;}
+  const elem=mon.element||'물리';
+  // 변종(엘리트)
+  if(mon.is_elite){return ELITE_URLS[elem]||ELITE_URLS['물리']||'';}
+  // 일반 — 이름 해시로 1~4번 고정
+  const pool=ELEM_URLS[elem]||ELEM_URLS['물리'];
+  let h=0; for(const c of (mon.name||''))h=(h*31+c.charCodeAt(0))|0;
+  return pool[Math.abs(h)%4];
+}
+
+// 속성 상성 계산
+const ELEM_ADV={
+  불:{풀:'🔼유리',얼음:'🔼유리',물:'🔽불리'},
+  물:{불:'🔼유리',번개:'🔽불리'},
+  번개:{물:'🔼유리',풀:'🔽불리'},
+  풀:{물:'🔼유리',번개:'🔼유리',불:'🔽불리'},
+  어둠:{풀:'🔼유리',불:'🔽불리'},
+  얼음:{불:'🔽불리',번개:'🔽불리',물:'🔼유리'},
+};
+const ELEM_EM={불:'🔥',물:'💧',번개:'⚡',풀:'🌿',어둠:'🌑',얼음:'❄️',물리:'⚔️'};
+function elemAdv(a,b){return (ELEM_ADV[a]&&ELEM_ADV[a][b])||'➡보통';}
+
 const PP = {  // 펫 팔레트
   토끼:{b:'#e0b4cc',a:'#ffaabb',e:'#ff2255'},강아지:{b:'#d4a870',a:'#b08040',e:'#442200'},
   고양이:{b:'#909090',a:'#c09090',e:'#22cc44'},다람쥐:{b:'#b48030',a:'#d4a238',e:'#110000'},
@@ -298,17 +408,26 @@ function render(){
   const bk=mon.is_boss?'boss':mon.is_elite?'elite':'normal';
   const bm={normal:'/normal_field.png',boss:'/Boss_field.png',elite:'/normal_field.png'};
   document.getElementById('bg').style.backgroundImage=`url('${BASE}${bm[bk]}')`;
-  // 스프라이트
-  drawPet(document.getElementById('pet-cv'), pet.name, pet.hp/pet.max_hp, false);
-  drawMon(document.getElementById('mon-cv'), mon.name, mon.element, mon.hp/mon.max_hp, mon.is_boss, mon.is_elite);
+  // 스프라이트 — 실제 이미지
+  const petEl=document.getElementById('pet-cv');
+  const petUrl=getPetUrl(pet.name,false);
+  if(petUrl){petEl.src=petUrl;petEl.onerror=()=>{petEl.src='';};}
+  const monEl=document.getElementById('mon-cv');
+  const monUrl=getMonUrl(mon,false);
+  if(monUrl){monEl.src=monUrl;monEl.onerror=()=>{monEl.src='';};}
+  // 속성 상성 표시
+  const adv=elemAdv(pet.element,mon.element);
+  const pem=ELEM_EM[pet.element]||'';const mem=ELEM_EM[mon.element]||'';
+  document.getElementById('elem-adv').textContent=`${pem}${pet.element} vs ${mem}${mon.element} ${adv}`;
   // 펫 UI
-  document.getElementById('pname').textContent=`${pet.emoji||'🐾'} ${pet.name} Lv.${pet.level} ${pet.element}`;
+  document.getElementById('pname').textContent=`${pet.emoji||'🐾'} ${pet.name} Lv.${pet.level} ${pem}${pet.element}`;
   bar('php', pet.hp, pet.max_hp, `HP ${pet.hp}/${pet.max_hp}`);
   bar('pmp', pet.cur_mana, pet.max_mana, `MP ${pet.cur_mana}/${pet.max_mana}`);
   for(let i=0;i<7;i++) document.getElementById('u'+i).className='ult-slot'+(i<pet.ult_gauge?' on':'');
   // 몬스터 UI
   const mt=mon.is_boss?'👑 BOSS ':mon.is_elite?'⚠️ ELITE ':'';
-  document.getElementById('mname').textContent=`${mt}${mon.emoji||'👹'} ${mon.name} Lv.${mon.level||0}`;
+  const mem2=ELEM_EM[mon.element]||'';
+  document.getElementById('mname').textContent=`${mt}${mon.emoji||'👹'} ${mon.name} Lv.${mon.level||0} ${mem2}${mon.element}`;
   bar('mhp', mon.hp, mon.max_hp, `HP ${mon.hp}/${mon.max_hp}`);
   document.getElementById('mdef').style.width=Math.min(100,((mon.def||0)/200)*100)+'%';
   document.getElementById('mdef-t').textContent=`DEF ${mon.def||0}`;
@@ -317,7 +436,7 @@ function render(){
 }
 
 function renderBtns(){
-  if(!G||locked)return;
+  if(!G)return;
   const pet=G.party[G.active];
   const s1=pet.skills?.skill1||{name:'스킬1',mana:10};
   const s2=pet.skills?.skill2||{name:'스킬2',mana:25};
@@ -343,6 +462,12 @@ function renderBtns(){
   document.getElementById('potc').textContent=ptot+'개';
   document.getElementById('b-pot').disabled=ptot===0||locked;
   document.getElementById('b-swp').disabled=locked||!G.party.some((p,i)=>p.alive&&i!==G.active);
+  document.getElementById('b-give').disabled=false;  // 포기는 항상 가능
+  // 궁극기/패링도 locked 아니면 활성
+  const ub2=document.getElementById('b-ult');
+  if(ub2.style.display!=='none') ub2.disabled=locked;
+  const pb2=document.getElementById('b-par');
+  if(pb2.style.display!=='none') pb2.disabled=locked;
 }
 
 // ════════════════════════════════════════════════════════
@@ -434,7 +559,7 @@ async function animAction(action){
   if(['skill1','skill2','ult','secret'].includes(action)){
     const cv=document.getElementById('pet-cv');
     cv.classList.add('attack');
-    drawPet(cv,pet.name,pet.hp/pet.max_hp,true);
+    const atkUrl=getPetUrl(pet.name,true); if(atkUrl) cv.src=atkUrl;
     showFx(ELEM_FX[pet.element]||'✨', ELEM_COL[pet.element]||'#fff', false);
     await sleep(340);
     const mc=document.getElementById('mon-cv');
@@ -444,7 +569,7 @@ async function animAction(action){
     mc.classList.remove('hit');
     document.getElementById('bg').classList.remove('flash');
     cv.classList.remove('attack');
-    drawPet(cv,pet.name,pet.hp/pet.max_hp,false);
+    const idleUrl=getPetUrl(pet.name,false); if(idleUrl) cv.src=idleUrl;
   }else if(action==='parry'){showFxTxt('⚡ 패링!','#f97316');await sleep(180);}
   else if(action==='defend'){showFxTxt('🛡️ 방어!','#60a5fa');await sleep(180);}
   else if(action==='opportunity'){showFxTxt('⚡ 기회!','#a3e635');await sleep(180);}
@@ -463,7 +588,7 @@ async function animMon(dmg, delayMs=800){
   await sleep(280);
   pc.style.filter='';
   const ap=G?.party?.[G?.active];
-  if(ap) drawPet(pc,ap.name,ap.hp/ap.max_hp,false);
+  if(ap){const u=getPetUrl(ap.name,false);if(u)pc.src=u;}
 }
 
 function showFx(icon, color, onMon=true){
@@ -572,7 +697,12 @@ function closeM(){document.getElementById('modal').classList.remove('show');}
 // ════════════════════════════════════════════════════════
 function fmt(n){if(!n)return'0';if(n>=100000000)return(n/1e8).toFixed(1)+'억';if(n>=10000)return~~(n/10000)+'만';return n.toLocaleString();}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-function disableAll(v){document.querySelectorAll('.btn').forEach(b=>b.disabled=v);}
+function disableAll(v){
+  document.querySelectorAll('.btn').forEach(b=>{
+    if(b.id==='b-give') return;  // 포기는 항상 활성
+    b.disabled=v;
+  });
+}
 function err(msg){document.body.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-size:17px;color:#f66;padding:20px">${msg}</div>`;}
 
 // ════════════════════════════════════════════════════════
