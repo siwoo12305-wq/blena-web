@@ -145,13 +145,14 @@ async def _kill(g,uid,logs,pd,pc,ag):
     if g["floor"]%10==9:
         evt=_rev(); g["current_event"]=evt; g["phase"]="event"; g["floor"]=nf
         return {"phase":"event","game_state":_s(g),"logs":logs,"event":evt,"pet_dmg":pd,"mon_dmg":0,"pet_crit":pc,"mon_anim_delay":0}
-    # blackarena.py 원본 순서: wins>=3 먼저, 그 다음 wins%3==0
-    if g["wins"]>=3:
-        g["phase"]="result"; g["floor"]=nf
-        return {"phase":"result","game_state":_s(g),"logs":logs,"reward":_reward(g),"pet_dmg":pd,"mon_dmg":0,"pet_crit":pc,"mon_anim_delay":0}
+    # 상점 먼저 (3승, 6승, 9승...) → 상점 후 계속하면 result
     if g["wins"]%3==0:
         g["shop_items"]=_shop(g); g["phase"]="shop"; g["floor"]=nf
         return {"phase":"shop","game_state":_s(g),"logs":logs,"shop_items":g["shop_items"],"pet_dmg":pd,"mon_dmg":0,"pet_crit":pc,"mon_anim_delay":0}
+    # 3승 이상이고 상점 안 걸리는 경우 → result
+    if g["wins"]>=3:
+        g["phase"]="result"; g["floor"]=nf
+        return {"phase":"result","game_state":_s(g),"logs":logs,"reward":_reward(g),"pet_dmg":pd,"mon_dmg":0,"pet_crit":pc,"mon_anim_delay":0}
     g["floor"]=nf; g["monster"]=_mon(nf,g.get("top_grade","common")); g["phase"]="battle"
     return {"phase":"battle","game_state":_s(g),"logs":logs+[f"➡️ {nf}층!"],"pet_dmg":pd,"mon_dmg":0,"pet_crit":pc,"mon_anim_delay":0}
 async def _dead(g,uid,pet,logs,pd,md,pc,ag):
