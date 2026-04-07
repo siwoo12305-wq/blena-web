@@ -16,15 +16,15 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 #bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .3s}
 #bg.flash{filter:brightness(2) saturate(2)}
 /* 스프라이트 — canvas */
-#pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;image-rendering:pixelated}
-#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;image-rendering:pixelated}
+#pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;image-rendering:pixelated;mix-blend-mode:screen;object-fit:contain}
+#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;image-rendering:pixelated;mix-blend-mode:screen;object-fit:contain;transform:scaleX(-1)}
 /* 히트 쉐이크 */
 #mon-cv.hit{animation:mhit .3s}
-@keyframes mhit{0%,100%{transform:translateX(0)}25%{transform:translateX(-12px)}75%{transform:translateX(10px)}}
+@keyframes mhit{0%,100%{transform:scaleX(-1) translateX(0)}25%{transform:scaleX(-1) translateX(12px)}75%{transform:scaleX(-1) translateX(-10px)}}
 #pet-cv.attack{animation:patk .35s}
 @keyframes patk{0%,100%{transform:translateX(0)}40%{transform:translateX(55px)}}
 #mon-cv.mon-attack{animation:matk .35s}
-@keyframes matk{0%,100%{transform:translateX(0)}40%{transform:translateX(-55px)}}
+@keyframes matk{0%,100%{transform:scaleX(-1) translateX(0)}40%{transform:scaleX(-1) translateX(55px)}}
 /* 이펙트 */
 #fx{position:absolute;inset:0;pointer-events:none}
 .fx-txt{position:absolute;font-size:36px;font-weight:900;animation:frise .8s forwards;pointer-events:none;text-shadow:0 0 16px currentColor}
@@ -89,7 +89,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 /* 모바일 */
 @media(max-width:600px){
   #pet-cv{width:120px;height:120px;bottom:120px;left:6px}
-  #mon-cv{width:120px;height:120px;top:50px;right:6px}
+  #mon-cv{width:120px;height:120px;top:50px;right:6px;transform:scaleX(-1)}
   #pet-ui{width:calc(100vw - 16px);left:8px;bottom:4px}
   #mon-ui{width:calc(100vw - 16px);right:8px;top:4px;font-size:11px}
   #hud{padding:4px 8px;height:38px}
@@ -106,7 +106,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
   <div class="floor">⚔️ BLACK ARENA TOWER | <span id="fl">1</span>층</div>
   <div id="elem-adv" style="font-size:12px;color:#FFD700;font-weight:700"></div>
   <div class="res">
-    <span>💰<span id="bet">-</span></span>
+    <span>🪙<span id="bet">-</span>야크</span>
     <span>🍃<span id="slv">0</span></span>
     <span>🌟<span id="gld">0</span></span>
     <span>승리<span id="wns">0</span>판</span>
@@ -115,8 +115,8 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 
 <div id="arena">
   <div id="bg"></div>
-  <img id="pet-cv" width="180" height="180" src="" style="object-fit:contain;background:transparent">
-  <img id="mon-cv" width="180" height="180" src="" style="object-fit:contain;background:transparent;transform:scaleX(-1)">
+  <img id="pet-cv" width="180" height="180" src="" alt="">
+  <img id="mon-cv" width="180" height="180" src="" alt="">
   <div id="fx"></div>
   <div id="log"></div>
   <div id="mon-ui">
@@ -152,6 +152,17 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 </div>
 
 <div id="modal"><div id="mbox"><h3 id="mt">선택</h3><div id="mc"></div><button class="mbtn mcancel" onclick="closeM()">❌ 닫기</button></div></div>
+
+<!-- 바이퍼의 상점 전용 화면 -->
+<div id="shop-screen" style="display:none;position:fixed;inset:0;z-index:150;background-size:cover;background-position:center">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+  <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px">
+    <h2 style="font-size:22px;font-weight:900;color:#FFD700;text-shadow:0 0 12px #f59e0b;margin-bottom:4px">🐍 바이퍼의 상점</h2>
+    <p style="font-size:13px;color:#ccc;margin-bottom:12px">스르륵… 어서오세요스르.. <span id="shop-res"></span></p>
+    <div id="shop-items" style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto"></div>
+    <button class="mbtn" style="margin-top:10px;max-width:420px;width:100%" onclick="skipShop()">⏭️ 스킵</button>
+  </div>
+</div>
 
 <div id="result">
   <h2 id="rt">결과</h2>
@@ -537,6 +548,7 @@ async function handleResult(d){
   }
   if(d.phase==='shop'){
     document.getElementById('result').classList.remove('show');
+    document.getElementById('shop-screen').style.display='none';
     showShop(); locked=false; return;
   }
   if(d.phase==='event'){
@@ -559,7 +571,8 @@ async function animAction(action){
   if(['skill1','skill2','ult','secret'].includes(action)){
     const cv=document.getElementById('pet-cv');
     cv.classList.add('attack');
-    const atkUrl=getPetUrl(pet.name,true); if(atkUrl) cv.src=atkUrl;
+    const atkUrl=getPetUrl(pet.name,true);
+    if(atkUrl){ await new Promise(res=>{const t=new Image();t.onload=()=>{cv.src=atkUrl;res();};t.onerror=res;t.src=atkUrl;}); }
     showFx(ELEM_FX[pet.element]||'✨', ELEM_COL[pet.element]||'#fff', false);
     await sleep(340);
     const mc=document.getElementById('mon-cv');
@@ -621,24 +634,32 @@ function showLog(txt){
 // ════════════════════════════════════════════════════════
 function showShop(){
   const items=G?.shop_items||[];
-  document.getElementById('mt').textContent='🏪 바이퍼의 상점';
-  document.getElementById('mc').innerHTML=
-    `<p style="color:#aaa;margin-bottom:8px">🍃 은잎: <b style="color:#6ee7b7">${G.silver||0}</b></p>`+
+  const ss=document.getElementById('shop-screen');
+  // 배경 이미지
+  ss.style.backgroundImage=`url('${B}/Viper%20shop.png')`;
+  ss.style.display='flex';
+  // 은잎/금잎
+  document.getElementById('shop-res').textContent=`🍃 ${G.silver||0}  🌟 ${G.gold||0}`;
+  // 아이템
+  document.getElementById('shop-items').innerHTML=
     items.map((item,i)=>{
-      const lbl=item.type==='potion'?`🧪 ${item.name} — ${item.cost||0}🍃`:`🗡️ ${item.name} — ${item.cost||0}🍃`;
+      const isPotion=item.type==='potion';
+      const icon=isPotion?'🧪':'🗡️';
+      const lbl=`${icon} ${item.name} — ${item.cost||0}🍃`;
       const dis=(item.cost||0)>(G.silver||0)?'disabled':'';
-      return `<button class="mbtn" onclick="buyItem(${i})" ${dis}>${lbl}</button>`;
-    }).join('')+
-    `<button class="mbtn" style="margin-top:6px" onclick="skipShop()">⏭️ 스킵</button>`;
-  document.getElementById('modal').classList.add('show');
+      const grade=item.grade?` <span style="font-size:10px;opacity:.7">[${item.grade}]</span>`:'';
+      return `<button class="mbtn" onclick="buyItem(${i})" ${dis}>${lbl}${grade}</button>`;
+    }).join('');
 }
 async function buyItem(idx){
   closeM();
+  document.getElementById('shop-screen').style.display='none';
   try{const d=await callAPI('buy',{idx});await handleResult(d);}
   catch(e){showLog('⚠️ '+e.message);render();}
 }
 async function skipShop(){
   closeM();
+  document.getElementById('shop-screen').style.display='none';
   try{const d=await callAPI('skip_shop');await handleResult(d);}
   catch(e){showLog('⚠️ '+e.message);render();}
 }
@@ -695,7 +716,7 @@ function closeM(){document.getElementById('modal').classList.remove('show');}
 // ════════════════════════════════════════════════════════
 // 유틸
 // ════════════════════════════════════════════════════════
-function fmt(n){if(!n)return'0';if(n>=100000000)return(n/1e8).toFixed(1)+'억';if(n>=10000)return~~(n/10000)+'만';return n.toLocaleString();}
+function fmt(n){if(!n)return'0';if(n>=100000000)return(n/1e8).toFixed(1)+'억야크';if(n>=10000)return~~(n/10000)+'만야크';return n.toLocaleString()+'야크';}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function disableAll(v){
   document.querySelectorAll('.btn').forEach(b=>{
