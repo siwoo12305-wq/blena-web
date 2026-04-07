@@ -16,8 +16,8 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 #bg{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .3s}
 #bg.flash{filter:brightness(2) saturate(2)}
 /* 스프라이트 — canvas */
-#pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;image-rendering:pixelated;mix-blend-mode:screen;object-fit:contain}
-#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;image-rendering:pixelated;mix-blend-mode:screen;object-fit:contain;transform:scaleX(-1)}
+#pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 0 0 transparent)}
+#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;object-fit:contain;transform:scaleX(-1)}
 /* 히트 쉐이크 */
 #mon-cv.hit{animation:mhit .3s}
 @keyframes mhit{0%,100%{transform:scaleX(-1) translateX(0)}25%{transform:scaleX(-1) translateX(12px)}75%{transform:scaleX(-1) translateX(-10px)}}
@@ -88,8 +88,8 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 .r-end{background:linear-gradient(135deg,#1d4ed8,#60a5fa);color:#fff}
 /* 모바일 */
 @media(max-width:600px){
-  #pet-cv{width:120px;height:120px;bottom:120px;left:6px}
-  #mon-cv{width:120px;height:120px;top:50px;right:6px;transform:scaleX(-1)}
+  #pet-cv{width:120px;height:120px;bottom:120px;left:6px;object-fit:contain}
+  #mon-cv{width:120px;height:120px;top:50px;right:6px;object-fit:contain;transform:scaleX(-1)}
   #pet-ui{width:calc(100vw - 16px);left:8px;bottom:4px}
   #mon-ui{width:calc(100vw - 16px);right:8px;top:4px;font-size:11px}
   #hud{padding:4px 8px;height:38px}
@@ -116,7 +116,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 <div id="arena">
   <div id="bg"></div>
   <img id="pet-cv" width="180" height="180" src="" alt="">
-  <img id="mon-cv" width="180" height="180" src="" alt="">
+  <img id="mon-cv" width="180" height="180" src="" alt="" style="transform:scaleX(-1);object-fit:contain">
   <div id="fx"></div>
   <div id="log"></div>
   <div id="mon-ui">
@@ -161,6 +161,16 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
     <p style="font-size:13px;color:#ccc;margin-bottom:12px">스르륵… 어서오세요스르.. <span id="shop-res"></span></p>
     <div id="shop-items" style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto"></div>
     <button class="mbtn" style="margin-top:10px;max-width:420px;width:100%" onclick="skipShop()">⏭️ 스킵</button>
+  </div>
+</div>
+
+<!-- 이벤트 라운드 전용 화면 -->
+<div id="event-screen" style="display:none;position:fixed;inset:0;z-index:150;background-size:cover;background-position:center">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+  <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center">
+    <div style="font-size:28px;font-weight:900;color:#FFD700;text-shadow:0 0 16px #f59e0b;margin-bottom:8px" id="evt-name">이벤트</div>
+    <p style="font-size:14px;color:#ddd;margin-bottom:20px;max-width:360px" id="evt-desc"></p>
+    <button class="rbtn r-cont" onclick="acceptEvent()">✅ 수락</button>
   </div>
 </div>
 
@@ -248,6 +258,16 @@ const MON_URL = {
   '검은 왕':{i:B+'/%EA%B2%80%EC%9D%80%20%EC%99%95_idle.png',a:B+'/%EA%B2%80%EC%9D%80%20%EC%99%95_attack.png'},
 };
 // 몬스터 속성별 이미지 (불1~불4, 변종)
+
+// 이벤트 배경 URL
+const EVT_BG = {
+  '메마른 샘물':   B+'/%EB%A7%A4%EB%A7%88%EB%A5%B8%20%EC%83%98%EB%AC%BC_event.png',
+  '무브의 은혜':   B+'/%EB%AC%B4%EB%B8%8C%EC%9D%98%20%EC%9D%80%ED%98%9C_event.png',
+  '하늘의 축복':   B+'/%ED%95%98%EB%8A%98%EC%9D%98%20%EC%B6%95%EB%B3%B5_event.png',
+  '자연의 단 한번':B+'/%EC%9E%90%EC%97%B0%EC%9D%98%20%EB%8B%A8%20%ED%95%9C%EB%B2%88_event.png',
+  '사랑의 날씨':   B+'/%EC%82%AC%EB%9E%91%EC%9D%98%20%EB%82%A0%EC%94%A8_event.png',
+  '피의 계약':     B+'/%ED%94%BC%EC%9D%98%20%EA%B3%84%EC%95%BD_event.png',
+};
 const ELEM_URLS = {
   불:[B+'/%EB%B6%881_idle.png',B+'/%EB%B6%882_idle.png',B+'/%EB%B6%883_idle.png',B+'/%EB%B6%884_idle.png'],
   물:[B+'/%EB%AC%BC1_idle.png',B+'/%EB%AC%BC2_idle.png',B+'/%EB%AC%BC3_idle.png',B+'/%EB%AC%BC4_idle.png'],
@@ -408,7 +428,7 @@ function render(){
   const g=G, pet=g.party[g.active], mon=g.monster;
   if(['result','defeat','ended'].includes(g.phase)){showResult();return;}
   if(g.phase==='shop'){showShop();return;}
-  if(g.phase==='event'){showEvent();return;}
+  if(g.phase==='event'){document.getElementById('shop-screen').style.display='none';showEvent();return;}
   document.getElementById('result').classList.remove('show');
   document.getElementById('fl').textContent=g.floor;
   document.getElementById('bet').textContent=fmt(g.bet);
@@ -553,6 +573,7 @@ async function handleResult(d){
   }
   if(d.phase==='event'){
     document.getElementById('result').classList.remove('show');
+    document.getElementById('event-screen').style.display='none';
     showEvent(); locked=false; return;
   }
   // 일반 전투
@@ -637,7 +658,7 @@ function showShop(){
   const ss=document.getElementById('shop-screen');
   // 배경 이미지
   ss.style.backgroundImage=`url('${B}/Viper%20shop.png')`;
-  ss.style.display='flex';
+  ss.style.display='block';
   // 은잎/금잎
   document.getElementById('shop-res').textContent=`🍃 ${G.silver||0}  🌟 ${G.gold||0}`;
   // 아이템
@@ -666,14 +687,17 @@ async function skipShop(){
 
 function showEvent(){
   const evt=G?.current_event||{};
-  document.getElementById('mt').textContent=`🎪 이벤트 — ${evt.name||'이벤트'}`;
-  document.getElementById('mc').innerHTML=
-    `<p style="color:#ccc;margin-bottom:10px">${evt.emoji||''} ${evt.desc||''}</p>`+
-    `<button class="mbtn" onclick="acceptEvent()">✅ 수락</button>`;
-  document.getElementById('modal').classList.add('show');
+  const es=document.getElementById('event-screen');
+  const bgUrl=EVT_BG[evt.name]||'';
+  es.style.backgroundImage=bgUrl?`url('${bgUrl}')`:'none';
+  es.style.background=bgUrl?'':'linear-gradient(135deg,#1a0a2e,#0a1a2e)';
+  document.getElementById('evt-name').textContent=`${evt.emoji||'✨'} ${evt.name||'이벤트'}`;
+  document.getElementById('evt-desc').textContent=evt.desc||'';
+  es.style.display='block';
 }
 async function acceptEvent(){
   closeM();
+  document.getElementById('event-screen').style.display='none';
   try{const d=await callAPI('event_accept');await handleResult(d);}
   catch(e){showLog('⚠️ '+e.message);render();}
 }
