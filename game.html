@@ -412,6 +412,38 @@ function drawMon(cv, name, elem, hpR=1, boss=false, elite=false){
   }
 }
 
+
+// ── 이미지 로드 + 검은배경 제거 ─────────────────────────────────────────
+function loadSprite(imgEl, url){
+  if(!url){imgEl.src='';return;}
+  const tmp=new Image();
+  tmp.crossOrigin='anonymous';
+  tmp.onload=function(){
+    // canvas로 검은배경 제거
+    const cv=document.createElement('canvas');
+    cv.width=tmp.naturalWidth; cv.height=tmp.naturalHeight;
+    const ctx=cv.getContext('2d');
+    ctx.drawImage(tmp,0,0);
+    try{
+      const id=ctx.getImageData(0,0,cv.width,cv.height);
+      const d=id.data;
+      for(let i=0;i<d.length;i+=4){
+        const r=d[i],g=d[i+1],b=d[i+2];
+        const bright=(r+g+b)/3;
+        if(r<50&&g<50&&b<50){ d[i+3]=0; }           // 완전 검은 → 투명
+        else if(bright<80){ d[i+3]=Math.floor(bright/80*255); } // 어두운 → 반투명
+      }
+      ctx.putImageData(id,0,0);
+      imgEl.src=cv.toDataURL('image/png');
+    }catch(e){
+      // CORS 오류시 그냥 원본 사용
+      imgEl.src=url;
+    }
+  };
+  tmp.onerror=()=>{imgEl.src='';};
+  tmp.src=url;
+}
+
 // ════════════════════════════════════════════════════════
 // 렌더링
 // ════════════════════════════════════════════════════════
@@ -440,12 +472,8 @@ function render(){
   const bm={normal:'/normal_field.png',boss:'/Boss_field.png',elite:'/normal_field.png'};
   document.getElementById('bg').style.backgroundImage=`url('${BASE}${bm[bk]}')`;
   // 스프라이트 — 실제 이미지
-  const petEl=document.getElementById('pet-cv');
-  const petUrl=getPetUrl(pet.name,false);
-  if(petUrl){petEl.src=petUrl;petEl.onerror=()=>{petEl.src='';};}
-  const monEl=document.getElementById('mon-cv');
-  const monUrl=getMonUrl(mon,false);
-  if(monUrl){monEl.src=monUrl;monEl.onerror=()=>{monEl.src='';};}
+  loadSprite(document.getElementById('pet-cv'), getPetUrl(pet.name,false));
+  loadSprite(document.getElementById('mon-cv'), getMonUrl(mon,false));
   // 속성 상성 표시
   const adv=elemAdv(pet.element,mon.element);
   const pem=ELEM_EM[pet.element]||'';const mem=ELEM_EM[mon.element]||'';
@@ -593,7 +621,7 @@ async function animAction(action){
     const cv=document.getElementById('pet-cv');
     cv.classList.add('attack');
     const atkUrl=getPetUrl(pet.name,true);
-    if(atkUrl){ await new Promise(res=>{const t=new Image();t.onload=()=>{cv.src=atkUrl;res();};t.onerror=res;t.src=atkUrl;}); }
+    if(atkUrl){ loadSprite(cv,atkUrl); await sleep(100); }
     showFx(ELEM_FX[pet.element]||'✨', ELEM_COL[pet.element]||'#fff', false);
     await sleep(340);
     const mc=document.getElementById('mon-cv');
@@ -603,7 +631,7 @@ async function animAction(action){
     mc.classList.remove('hit');
     document.getElementById('bg').classList.remove('flash');
     cv.classList.remove('attack');
-    const idleUrl=getPetUrl(pet.name,false); if(idleUrl) cv.src=idleUrl;
+    loadSprite(cv, getPetUrl(pet.name,false));
   }else if(action==='parry'){showFxTxt('⚡ 패링!','#f97316');await sleep(180);}
   else if(action==='defend'){showFxTxt('🛡️ 방어!','#60a5fa');await sleep(180);}
   else if(action==='opportunity'){showFxTxt('⚡ 기회!','#a3e635');await sleep(180);}
@@ -622,7 +650,7 @@ async function animMon(dmg, delayMs=800){
   await sleep(280);
   pc.style.filter='';
   const ap=G?.party?.[G?.active];
-  if(ap){const u=getPetUrl(ap.name,false);if(u)pc.src=u;}
+  if(ap) loadSprite(pc, getPetUrl(ap.name,false));
 }
 
 function showFx(icon, color, onMon=true){
