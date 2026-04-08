@@ -17,14 +17,14 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 #bg.flash{filter:brightness(2) saturate(2)}
 /* 스프라이트 — canvas */
 #pet-cv{position:absolute;bottom:145px;left:60px;width:180px;height:180px;object-fit:contain;filter:drop-shadow(0 0 0 transparent)}
-#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;object-fit:contain;transform:scaleX(-1)}
+#mon-cv{position:absolute;top:70px;right:60px;width:180px;height:180px;object-fit:contain}
 /* 히트 쉐이크 */
 #mon-cv.hit{animation:mhit .3s}
-@keyframes mhit{0%,100%{transform:scaleX(-1) translateX(0)}25%{transform:scaleX(-1) translateX(12px)}75%{transform:scaleX(-1) translateX(-10px)}}
+@keyframes mhit{0%,100%{transform:translateX(0)}25%{transform:translateX(12px)}75%{transform:translateX(-10px)}}
 #pet-cv.attack{animation:patk .35s}
 @keyframes patk{0%,100%{transform:translateX(0)}40%{transform:translateX(55px)}}
 #mon-cv.mon-attack{animation:matk .35s}
-@keyframes matk{0%,100%{transform:scaleX(-1) translateX(0)}40%{transform:scaleX(-1) translateX(55px)}}
+@keyframes matk{0%,100%{transform:translateX(0)}40%{transform:translateX(55px)}}
 /* 이펙트 */
 #fx{position:absolute;inset:0;pointer-events:none}
 .fx-txt{position:absolute;font-size:36px;font-weight:900;animation:frise .8s forwards;pointer-events:none;text-shadow:0 0 16px currentColor}
@@ -89,7 +89,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 /* 모바일 */
 @media(max-width:600px){
   #pet-cv{width:120px;height:120px;bottom:120px;left:6px;object-fit:contain}
-  #mon-cv{width:120px;height:120px;top:50px;right:6px;object-fit:contain;transform:scaleX(-1)}
+  #mon-cv{width:120px;height:120px;top:50px;right:6px;object-fit:contain}
   #pet-ui{width:calc(100vw - 16px);left:8px;bottom:4px}
   #mon-ui{width:calc(100vw - 16px);right:8px;top:4px;font-size:11px}
   #hud{padding:4px 8px;height:38px}
@@ -116,7 +116,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Noto Sans KR',sans-serif;overflo
 <div id="arena">
   <div id="bg"></div>
   <img id="pet-cv" width="180" height="180" src="" alt="">
-  <img id="mon-cv" width="180" height="180" src="" alt="" style="transform:scaleX(-1);object-fit:contain">
+  <img id="mon-cv" width="180" height="180" src="" alt="" style="object-fit:contain">
   <div id="fx"></div>
   <div id="log"></div>
   <div id="mon-ui">
@@ -260,13 +260,35 @@ const MON_URL = {
 // 몬스터 속성별 이미지 (불1~불4, 변종)
 
 // 이벤트 배경 URL
+const POTION_URL = {
+  'HP포션':    'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/HP%20%ED%8F%AC%EC%85%98_potion.png',
+  '신비한포션': 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EC%8B%A0%EB%B9%84%ED%95%9C%20%ED%8F%AC%EC%85%98_potion.png',
+  '마력포션':  'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%A7%88%EB%A0%A5%20%ED%8F%AC%EC%85%98_potion.png',
+  '크리포션':  'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%81%AC%EB%A6%AC%20%ED%8F%AC%EC%85%98_potion.png',
+  '방무포션':  'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%B0%A9%EB%AC%B4%20%ED%8F%AC%EC%85%98_potion.png',
+  '명중포션':  'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%AA%85%EC%A4%91%20%ED%8F%AC%EC%85%98_potion.png',
+};
+const WEAPON_URL = {
+  '검':         'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EA%B2%80_weapon.png',
+  '단검':       'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%8B%A8%EA%B2%80_weapon.png',
+  '지팡이':     'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EC%A7%80%ED%8C%A1%EC%9D%B4_weapon.png',
+  '방패':       'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%B0%A9%ED%8C%A8_weapon.png',
+  '도끼':       'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%8F%84%EB%81%BC_weapon.png',
+  '낫':         'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%82%AB_weapon.png',
+  '창':         'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EC%B0%BD_weapon.png',
+  '활':         'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%99%9C_weapon.png',
+  '독왕의 송곳니': 'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%8F%85%EC%99%95%EC%9D%98%20%EC%86%A1%EA%B3%B3%EB%8B%88_weapon.png',
+  '피 묻은 손톱':  'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%94%BC%20%EB%AC%BB%EC%9D%80%20%EC%86%90%ED%86%B1_weapon.png',
+};
+
 const EVT_BG = {
-  '메마른 샘물':   B+'/%EB%A7%A4%EB%A7%88%EB%A5%B8%20%EC%83%98%EB%AC%BC_event.png',
-  '무브의 은혜':   B+'/%EB%AC%B4%EB%B8%8C%EC%9D%98%20%EC%9D%80%ED%98%9C_event.png',
-  '하늘의 축복':   B+'/%ED%95%98%EB%8A%98%EC%9D%98%20%EC%B6%95%EB%B3%B5_event.png',
-  '자연의 단 한번':B+'/%EC%9E%90%EC%97%B0%EC%9D%98%20%EB%8B%A8%20%ED%95%9C%EB%B2%88_event.png',
-  '사랑의 날씨':   B+'/%EC%82%AC%EB%9E%91%EC%9D%98%20%EB%82%A0%EC%94%A8_event.png',
-  '피의 계약':     B+'/%ED%94%BC%EC%9D%98%20%EA%B3%84%EC%95%BD_event.png',
+  '메마른 샘물':   'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%A7%A4%EB%A7%88%EB%A5%B8%20%EC%83%98%EB%AC%BC_event.png',
+  '무브의 은혜':   'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EB%AC%B4%EB%B8%8C%EC%9D%98%20%EC%9D%80%ED%98%9C_event.png',
+  '하늘의 축복':   'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%95%98%EB%8A%98%EC%9D%98%20%EC%B6%95%EB%B3%B5_event.png',
+  '축복의 샘물':   'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%95%98%EB%8A%98%EC%9D%98%20%EC%B6%95%EB%B3%B5_event.png',
+  '자연의 단 한번':'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EC%9E%90%EC%97%B0%EC%9D%98%20%EB%8B%A8%20%ED%95%9C%EB%B2%88_event.png',
+  '사랑의 날씨':   'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%EC%82%AC%EB%9E%91%EC%9D%98%20%EB%82%A0%EC%94%A8_event.png',
+  '피의 계약':     'https://raw.githubusercontent.com/siwoo12305-wq/tbh-assets/refs/heads/main/%ED%94%BC%EC%9D%98%20%EA%B3%84%EC%95%BD_event.png',
 };
 const ELEM_URLS = {
   불:[B+'/%EB%B6%881_idle.png',B+'/%EB%B6%882_idle.png',B+'/%EB%B6%883_idle.png',B+'/%EB%B6%884_idle.png'],
@@ -460,7 +482,7 @@ function render(){
   const g=G, pet=g.party[g.active], mon=g.monster;
   if(['result','defeat','ended'].includes(g.phase)){showResult();return;}
   if(g.phase==='shop'){showShop();return;}
-  if(g.phase==='event'){document.getElementById('shop-screen').style.display='none';showEvent();return;}
+  if(g.phase==='event'){document.getElementById('shop-screen').style.display='none';if(g.current_event)G.current_event=g.current_event;showEvent();return;}
   document.getElementById('result').classList.remove('show');
   document.getElementById('fl').textContent=g.floor;
   document.getElementById('bet').textContent=fmt(g.bet);
@@ -601,7 +623,7 @@ async function handleResult(d){
   }
   if(d.phase==='event'){
     document.getElementById('result').classList.remove('show');
-    document.getElementById('event-screen').style.display='none';
+    if(d.event) G.current_event=d.event;
     showEvent(); locked=false; return;
   }
   // 일반 전투
@@ -693,11 +715,13 @@ function showShop(){
   document.getElementById('shop-items').innerHTML=
     items.map((item,i)=>{
       const isPotion=item.type==='potion';
+      const imgUrl=isPotion?(POTION_URL[item.name]||''):(WEAPON_URL[item.name]||'');
+      const imgTag=imgUrl?`<img src="${imgUrl}" style="width:32px;height:32px;object-fit:contain;vertical-align:middle;margin-right:6px" onerror="this.style.display='none'">`:'';
       const icon=isPotion?'🧪':'🗡️';
-      const lbl=`${icon} ${item.name} — ${item.cost||0}🍃`;
+      const lbl=`${imgTag}${icon} ${item.name} — ${item.cost||0}🍃`;
       const dis=(item.cost||0)>(G.silver||0)?'disabled':'';
       const grade=item.grade?` <span style="font-size:10px;opacity:.7">[${item.grade}]</span>`:'';
-      return `<button class="mbtn" onclick="buyItem(${i})" ${dis}>${lbl}${grade}</button>`;
+      return `<button class="mbtn" onclick="buyItem(${i})" ${dis} style="display:flex;align-items:center">${lbl}${grade}</button>`;
     }).join('');
 }
 async function buyItem(idx){
