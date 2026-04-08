@@ -66,10 +66,16 @@ def _load_mon_data():
     except Exception as e:
         print(f"[mon_data] {e}"); return False
 
+# 서버 시작 시 미리 로드 시도
+try: _load_mon_data()
+except: pass
+
 def _mon(floor,tg="common"):
     # 1순위: blackarena.build_monster (봇 실행 중일 때)
     try:
-        from cogs.blackarena import build_monster; return build_monster(floor,tg)
+        from cogs.blackarena import build_monster
+        result = build_monster(floor,tg)
+        return result
     except: pass
     # 2순위: bat_data 직접 사용
     if _load_mon_data():
